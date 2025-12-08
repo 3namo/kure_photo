@@ -223,7 +223,7 @@ function addSpotToMap(lat, lon, type, name, source, bgClass, iconClass = "fa-map
         .addTo(markersLayer);
 }
 
-// 3. AIに聞く (Gemini)
+// 3. AIに聞く (Gemini) - エラーハンドリング強化版
 async function askAI() {
     const geminiKey = document.getElementById('gemini-key').value;
     const mood = document.getElementById('user-mood').value;
@@ -231,7 +231,8 @@ async function askAI() {
     if(!geminiKey) { alert("Gemini APIキーを入力してください"); return; }
     if(gatheredSpots.length === 0) { alert("周辺にスポットがありません"); return; }
 
-    document.getElementById('ai-response').innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> AIがルートを生成中...';
+    const responseArea = document.getElementById('ai-response');
+    responseArea.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> AIがルートを生成中...';
 
     // データの要約 (ランダム30件)
     const spotsList = gatheredSpots
@@ -258,10 +259,26 @@ ${spotsList}
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
         });
+        
         const result = await res.json();
+
+        // ★修正ポイント: APIがエラーを返していないかチェックする
+        if (result.error) {
+            console.error("Gemini API Error:", result.error);
+            throw new Error(`Google APIのエラー: ${result.error.message}`);
+        }
+
+        // 候補がない場合（Safety filterなど）のチェック
+        if (!result.candidates || result.candidates.length === 0) {
+            throw new Error("AIからの回答が空でした。(安全フィルター等の可能性)");
+        }
+
         const text = result.candidates[0].content.parts[0].text;
-        document.getElementById('ai-response').innerHTML = marked.parse(text);
+        responseArea.innerHTML = marked.parse(text);
+
     } catch(e) {
-        document.getElementById('ai-response').innerHTML = "AIエラー: " + e.message;
+        console.error(e);
+        responseArea.innerHTML = `<div style="color:red; font-weight:bold;">AIエラー発生</div>
+        <small>${e.message}</small>`;
     }
 }
