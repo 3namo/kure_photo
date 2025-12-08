@@ -3,6 +3,11 @@
 // ==========================================
 const WEATHER_API_KEY = "f5ced26dbed1c3f5d9ca115851dd4cce";
 const KURE_API_KEY    = "a2620ef7-164e-467c-85c6-a51ca43f1fe5";
+
+// ★モデル名の設定 (7行目)
+// ここをご希望の "gemini-3-pro-preview" に変更しました。
+// もし動かない場合は "gemini-1.5-flash" に戻してください。
+const GEMINI_MODEL_NAME = "gemini-3-pro-preview"; 
 // ==========================================
 
 // グローバル変数
@@ -11,24 +16,22 @@ let markersLayer = L.layerGroup();
 let currentLat, currentLon;
 let gatheredSpots = [];
 let weatherDescription = "";
-let forecastText = ""; // AIに伝えるための予報テキスト
+let forecastText = ""; 
 
 // --- 1. 初期化処理 ---
 window.onload = function() {
-    // 地図を呉市中心に表示
     map = L.map('map').setView([34.248, 132.565], 14);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors'
     }).addTo(map);
     markersLayer.addTo(map);
 
-    // 地図クリックイベント
     map.on('click', async function(e) {
         await startExploration(e.latlng.lat, e.latlng.lng);
     });
 };
 
-// --- 時計の更新 (リアルタイム表示) ---
+// --- 時計の更新 ---
 setInterval(() => {
     const now = new Date();
     const timeStr = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
@@ -36,7 +39,6 @@ setInterval(() => {
     if(clockEl) clockEl.innerText = timeStr;
 }, 1000);
 
-// ログ出力用関数
 function log(msg) {
     const el = document.getElementById('log-area');
     el.innerHTML += `<div>${msg}</div>`;
@@ -49,34 +51,30 @@ async function startExploration(lat, lon) {
     gatheredSpots = [];
     markersLayer.clearLayers();
     
-    // 現在地ピン
     L.marker([lat, lon]).addTo(markersLayer).bindPopup("現在地").openPopup();
     
-    // UI更新
     document.getElementById('btn-search').disabled = true;
     document.getElementById('ai-response').innerHTML = "データ収集中...";
     document.getElementById('log-area').innerHTML = ""; 
     log(`📍 探索開始: ${lat.toFixed(4)}, ${lon.toFixed(4)}`);
 
-    // 呉市データセットIDの取得
-    const idManhole = document.getElementById('id-manhole').value;
-    const idCulture = document.getElementById('id-culture').value;
-    const idShelter = document.getElementById('id-shelter').value;
+    const idManhole = document.getElementById('id-manhole') ? document.getElementById('id-manhole').value : null;
+    const idCulture = document.getElementById('id-culture') ? document.getElementById('id-culture').value : null;
+    const idShelter = document.getElementById('id-shelter') ? document.getElementById('id-shelter').value : null;
 
     const promises = [];
     
-    // A. 天気取得 (現在 + 予報)
+    // A. 天気
     promises.push(fetchWeather(lat, lon));
     
-    // B. OSM取得 (特盛りバージョン)
+    // B. OSM
     promises.push(fetchOverpass(lat, lon));
 
-    // C. 呉市データ取得 (IDがあるものだけ)
+    // C. 呉市データ
     if(idManhole) promises.push(fetchKureData(idManhole, "デザインマンホール"));
     if(idCulture) promises.push(fetchKureData(idCulture, "文化財・レトロ"));
     if(idShelter) promises.push(fetchKureData(idShelter, "避難所・高台"));
 
-    // 全API完了待ち
     await Promise.all(promises);
 
     log(`✅ 完了。${gatheredSpots.length} 件のスポット発見。`);
@@ -84,49 +82,42 @@ async function startExploration(lat, lon) {
     document.getElementById('ai-response').innerHTML = `データ収集完了！<br>現在の天気: ${weatherDescription}<br>発見スポット: ${gatheredSpots.length}件<br>「AIにプランを聞く」を押してください。`;
 }
 
-// --- API A: 天気予報取得 (現在天気 + 3時間ごとの予報) ---
+// --- API A: 天気予報 ---
 async function fetchWeather(lat, lon) {
     if (WEATHER_API_KEY.includes("貼り付け")) {
         log("⚠️ OpenWeatherキー未設定"); return;
     }
     
     try {
-        // 1. 現在の天気
+        // 現在
         const currentUrl = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${WEATHER_API_KEY}&lang=ja&units=metric`;
         const resCurrent = await fetch(currentUrl);
         const currentData = await resCurrent.json();
         
-        // 画面更新 (現在)
         const curDesc = currentData.weather[0].description;
         const curTemp = Math.round(currentData.main.temp);
         const curIcon = `https://openweathermap.org/img/wn/${currentData.weather[0].icon}@2x.png`;
         
-        // index.htmlに追加した要素へ値をセット
         const iconEl = document.getElementById('weather-icon');
         if(iconEl) iconEl.src = curIcon;
-        
         const tempEl = document.getElementById('weather-temp');
         if(tempEl) tempEl.innerText = `${curTemp}℃`;
-        
         const descEl = document.getElementById('weather-desc');
         if(descEl) descEl.innerText = curDesc;
 
         weatherDescription = `${curDesc} (気温:${curTemp}℃)`;
         log(`🌤 現在: ${weatherDescription}`);
 
-        // 2. 未来の予報 (5日分/3時間ごと)
+        // 予報
         const forecastUrl = `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&appid=${WEATHER_API_KEY}&lang=ja&units=metric`;
         const resForecast = await fetch(forecastUrl);
         const forecastData = await resForecast.json();
 
-        // 画面更新 (未来) & AI用テキスト生成
         const container = document.getElementById('forecast-container');
-        if(container) container.innerHTML = ""; // クリア
-        forecastText = ""; // リセット
+        if(container) container.innerHTML = ""; 
+        forecastText = ""; 
 
-        // 向こう4回分 (約12時間後まで) を取得
         const list = forecastData.list.slice(0, 4); 
-        
         list.forEach(item => {
             const date = new Date(item.dt * 1000);
             const time = date.getHours() + ":00";
@@ -134,7 +125,6 @@ async function fetchWeather(lat, lon) {
             const desc = item.weather[0].description;
             const icon = `https://openweathermap.org/img/wn/${item.weather[0].icon}.png`;
 
-            // HTML生成
             if(container) {
                 const div = document.createElement('div');
                 div.className = "forecast-item";
@@ -145,20 +135,16 @@ async function fetchWeather(lat, lon) {
                 `;
                 container.appendChild(div);
             }
-
-            // AI用の文章を作る ("15:00は雨(18℃), ...")
             forecastText += `${time}は${desc}(${temp}℃), `;
         });
-
         log(`🔮 予報取得: ${list.length}件`);
-
     } catch(e) {
         log(`❌ 天気エラー: ${e.message}`);
         weatherDescription = "取得失敗";
     }
 }
 
-// --- API B: OSM (Overpass Turbo 特盛り) ---
+// --- API B: OSM ---
 async function fetchOverpass(lat, lon) {
     log("🌍 OSMデータ検索中(特盛り)...");
     const query = `
@@ -191,7 +177,6 @@ async function fetchOverpass(lat, lon) {
             const elLon = el.lon || el.center.lon;
             const tags = el.tags || {};
             
-            // アイコン判定ロジック
             let type = "その他";
             let bgClass = "bg-osm";
             let iconClass = "fa-map-pin";
@@ -212,7 +197,7 @@ async function fetchOverpass(lat, lon) {
     } catch(e) { log(`❌ OSMエラー: ${e.message}`); }
 }
 
-// --- API C: 呉市データ (実際のAPI仕様に修正済み) ---
+// --- API C: 呉市データ ---
 async function fetchKureData(endpointId, label) {
     if (KURE_API_KEY.includes("貼り付け")) {
         log("⚠️ 呉市APIキー未設定"); return;
@@ -248,10 +233,8 @@ async function fetchKureData(endpointId, label) {
     } catch(e) { log(`❌ 呉APIエラー: ${e.message}`); }
 }
 
-// --- マーカー追加ヘルパー ---
 function addSpotToMap(lat, lon, type, name, source, bgClass, iconClass = "fa-map-pin") {
     gatheredSpots.push({ lat, lon, type, name, source });
-
     const icon = L.divIcon({
         className: '',
         html: `<div class="custom-icon ${bgClass}" style="width:24px; height:24px;">
@@ -261,13 +244,10 @@ function addSpotToMap(lat, lon, type, name, source, bgClass, iconClass = "fa-map
         iconAnchor: [12, 12],
         popupAnchor: [0, -12]
     });
-
-    L.marker([lat, lon], {icon: icon})
-        .bindPopup(`<b>${name}</b><br>${type}<br><small>${source}</small>`)
-        .addTo(markersLayer);
+    L.marker([lat, lon], {icon: icon}).bindPopup(`<b>${name}</b><br>${type}<br><small>${source}</small>`).addTo(markersLayer);
 }
 
-// --- 3. AIに聞く (Gemini) - 修正版 ---
+// --- 3. AIに聞く (モデル変数使用版) ---
 async function askAI() {
     const geminiKey = document.getElementById('gemini-key').value;
     const mood = document.getElementById('user-mood').value;
@@ -278,7 +258,6 @@ async function askAI() {
     const responseArea = document.getElementById('ai-response');
     responseArea.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> AIがルートを生成中...';
 
-    // データの要約 (ランダム30件)
     const spotsList = gatheredSpots
         .sort(() => 0.5 - Math.random())
         .slice(0, 30)
@@ -304,9 +283,8 @@ ${spotsList}
 `;
 
     try {
-        // ★修正箇所: モデル名を 'gemini-1.5-flash' から 'gemini-1.5-flash-latest' に変更
-        // もしこれでもエラーになる場合は 'gemini-pro' に書き換えてみてください
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${geminiKey}`;
+        // ★ここで上部の GEMINI_MODEL_NAME 変数を使います
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL_NAME}:generateContent?key=${geminiKey}`;
         
         const res = await fetch(url, {
             method: 'POST',
@@ -316,10 +294,10 @@ ${spotsList}
         
         const result = await res.json();
 
-        // エラーチェック
         if (result.error) {
             console.error("Gemini API Error:", result.error);
-            throw new Error(`Google APIのエラー: ${result.error.message}`);
+            // エラーを見やすく表示
+            throw new Error(`Google APIのエラー: ${result.error.message} (Model: ${GEMINI_MODEL_NAME})`);
         }
         if (!result.candidates || result.candidates.length === 0) {
             throw new Error("AIからの回答が空でした。(安全フィルター等の可能性)");
