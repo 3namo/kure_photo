@@ -1,0 +1,55 @@
+/* --- レイアウト基本設定 --- */
+body { margin: 0; padding: 0; font-family: "Helvetica Neue", Arial, sans-serif; display: flex; height: 100vh; }
+
+/* サイドバー */
+#sidebar {
+    width: 380px; background: #f8f9fa; padding: 20px;
+    box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+    overflow-y: auto; z-index: 1000; display: flex; flex-direction: column;
+}
+
+/* 地図 */
+#map { flex-grow: 1; height: 100%; cursor: crosshair; }
+
+/* フォーム部品 */
+h2 { margin-top: 0; color: #333; font-size: 1.5rem; }
+.control-group { margin-bottom: 15px; border-bottom: 1px solid #ddd; padding-bottom: 15px; }
+label { display: block; font-weight: bold; margin-bottom: 5px; color: #555; font-size: 0.9em; }
+.hint { font-size: 0.8em; color: #888; margin-bottom: 5px; }
+input { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; margin-bottom: 5px; }
+
+/* ボタン */
+button {
+    width: 100%; padding: 12px; background: #007bff; color: white;
+    border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 1em; transition: 0.2s;
+}
+button:hover { background: #0056b3; }
+button:disabled { background: #ccc; cursor: not-allowed; }
+
+/* ログ・AI回答表示エリア */
+#log-area { font-size: 0.8em; color: #666; margin-bottom: 10px; height: 60px; overflow-y: scroll; background: #eee; padding: 5px; border-radius: 4px;}
+#ai-response { flex-grow: 1; padding: 10px; background: white; border: 1px solid #ddd; border-radius: 4px; overflow-y: auto; font-size: 0.95em; line-height: 1.6; }
+
+/* --- アイコン装飾 (MapCSS再現) --- */
+.custom-icon {
+    display: flex; justify-content: center; align-items: center;
+    border-radius: 50%; color: white;
+    box-shadow: 0 3px 5px rgba(0,0,0,0.4);
+    border: 2px solid white;
+    font-size: 14px;
+}
+
+/* カラーパレット (Overpass Turboの指定色) */
+.bg-steps   { background: #00BFFF; } /* 階段: Deep Sky Blue */
+.bg-path    { background: #87CEEB; } /* 路地: Sky Blue */
+.bg-shrine  { background: #FF4500; } /* 神社・鳥居: Orange Red */
+.bg-temple  { background: #800080; } /* お寺: Purple */
+.bg-view    { background: #32CD32; } /* 絶景: Lime Green */
+.bg-infra   { background: #708090; } /* インフラ: Slate Gray */
+.bg-retro   { background: #8B4513; } /* レトロ: Saddle Brown */
+.bg-lamp    { background: #FFD700; color: #333; border-color: #333; } /* 街灯 */
+.bg-vending { background: #0000FF; } /* 自販機: Blue */
+.bg-manhole { background: #A9A9A9; } /* マンホール: Dark Gray */
+
+/* 呉市公式データ用 */
+.bg-kure    { background: #FF00FF; border: 2px solid yellow; }

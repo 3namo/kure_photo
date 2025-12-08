@@ -10,26 +10,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
-    <style>
-        body { margin: 0; padding: 0; font-family: "Helvetica Neue", Arial, sans-serif; display: flex; height: 100vh; }
-        #sidebar { width: 380px; background: #f8f9fa; padding: 20px; overflow-y: auto; z-index: 1000; display: flex; flex-direction: column; box-shadow: 2px 0 5px rgba(0,0,0,0.1); }
-        #map { flex-grow: 1; height: 100%; cursor: crosshair; }
-        .control-group { margin-bottom: 15px; border-bottom: 1px solid #ddd; padding-bottom: 15px; }
-        label { display: block; font-weight: bold; margin-bottom: 5px; color: #555; font-size: 0.9em; }
-        input { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; margin-bottom: 5px; }
-        button { width: 100%; padding: 12px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 1em; transition: 0.2s; }
-        button:hover { background: #0056b3; }
-        button:disabled { background: #ccc; cursor: not-allowed; }
-        #log-area { font-size: 0.8em; color: #666; margin-bottom: 10px; height: 60px; overflow-y: scroll; background: #eee; padding: 5px; border-radius: 4px;}
-        #ai-response { flex-grow: 1; padding: 10px; background: white; border: 1px solid #ddd; border-radius: 4px; overflow-y: auto; }
-        
-        /* アイコン装飾 */
-        .custom-icon { display: flex; justify-content: center; align-items: center; border-radius: 50%; color: white; font-size: 14px; box-shadow: 0 3px 5px rgba(0,0,0,0.3); border: 2px solid white; }
-        .bg-osm { background: #FF4500; }
-        .bg-kure { background: #0000FF; }
-        .bg-steps { background: #00BFFF; }
-        .bg-view { background: #32CD32; }
-    </style>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
@@ -42,10 +23,11 @@
         </div>
 
         <div class="control-group">
-            <label>2. 呉市データセットID (カタログ参照)</label>
-            <input type="text" id="placeholder" placeholder="例: デザインマンホールのID" value="design-manhole-list-1">
-            <input type="text" id="id-culture" placeholder="文化財・歴史のID" value="cultural-property-list-1">
-            <input type="text" id="id-shelter" placeholder="避難所のID (絶景探し用)" value="shelter-1">
+            <label>2. 呉市データセットID</label>
+            <div class="hint">※カタログURL末尾のIDを入力</div>
+            <input type="text" id="id-manhole" placeholder="デザインマンホール" value="design-manhole-list-1">
+            <input type="text" id="id-culture" placeholder="文化財・歴史" value="cultural-property-list-1">
+            <input type="text" id="id-shelter" placeholder="避難所(絶景用)" value="shelter-1">
         </div>
 
         <div class="control-group">
@@ -61,220 +43,6 @@
 
     <div id="map"></div>
 
-    <script>
-        // ==========================================
-        // ★ここにAPIキーを貼り付けてください★
-        // ==========================================
-        const WEATHER_API_KEY = "f5ced26dbed1c3f5d9ca115851dd4cce";
-        const KURE_API_KEY    = "a2620ef7-164e-467c-85c6-a51ca43f1fe5";
-        // ==========================================
-
-        // --- グローバル変数 ---
-        let map;
-        let markersLayer = L.layerGroup();
-        let currentLat, currentLon;
-        let gatheredSpots = [];
-        let weatherDescription = "";
-
-        // --- 1. 初期化 ---
-        window.onload = function() {
-            map = L.map('map').setView([34.248, 132.565], 14);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '© OpenStreetMap contributors'
-            }).addTo(map);
-            markersLayer.addTo(map);
-
-            map.on('click', async function(e) {
-                await startExploration(e.latlng.lat, e.latlng.lng);
-            });
-        };
-
-        function log(msg) {
-            const el = document.getElementById('log-area');
-            el.innerHTML += `<div>${msg}</div>`;
-            el.scrollTop = el.scrollHeight;
-        }
-
-        // --- 2. 探索開始 ---
-        async function startExploration(lat, lon) {
-            currentLat = lat; currentLon = lon;
-            gatheredSpots = [];
-            markersLayer.clearLayers();
-            
-            L.marker([lat, lon]).addTo(markersLayer).bindPopup("現在地").openPopup();
-            document.getElementById('btn-search').disabled = true;
-            document.getElementById('ai-response').innerHTML = "データ収集中...";
-            document.getElementById('log-area').innerHTML = ""; 
-
-            log(`📍 探索開始: ${lat.toFixed(4)}, ${lon.toFixed(4)}`);
-
-            const dId1 = document.getElementById('dataset-id-1').value;
-            const dId2 = document.getElementById('dataset-id-2').value;
-
-            // APIリクエスト並行実行
-            const promises = [];
-            
-            // A. 天気 (定数を使用)
-            promises.push(fetchWeather(lat, lon));
-            
-            // B. OSM
-            promises.push(fetchOverpass(lat, lon));
-
-            // C. 呉市公式 (定数を使用)
-            if(dId1) promises.push(fetchKureData(dId1, "公式データ1"));
-            if(dId2) promises.push(fetchKureData(dId2, "公式データ2"));
-
-            await Promise.all(promises);
-
-            log(`✅ 完了。${gatheredSpots.length} 件のスポット発見。`);
-            document.getElementById('btn-search').disabled = false;
-            document.getElementById('ai-response').innerHTML = `データ収集完了！<br>現在の天気: ${weatherDescription}<br>発見スポット: ${gatheredSpots.length}件<br>ボタンを押してAIに聞いてください。`;
-        }
-
-        // --- API A: 天気 (OpenWeather) ---
-        async function fetchWeather(lat, lon) {
-            if (WEATHER_API_KEY.includes("貼り付け")) {
-                log("⚠️ OpenWeatherキーが設定されていません"); return;
-            }
-            try {
-                const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${WEATHER_API_KEY}&lang=ja&units=metric`;
-                const res = await fetch(url);
-                const data = await res.json();
-                weatherDescription = `${data.weather[0].description} (気温:${data.main.temp}℃)`;
-                log(`🌤 天気: ${weatherDescription}`);
-            } catch(e) {
-                log(`❌ 天気エラー: ${e.message}`);
-                weatherDescription = "取得失敗";
-            }
-        }
-
-        // --- API B: OSM (Overpass) ---
-        async function fetchOverpass(lat, lon) {
-            log("🌍 OSM検索中...");
-            const query = `
-                [out:json][timeout:25];
-                (
-                  way["highway"="steps"](around:1000, ${lat}, ${lon});
-                  node["amenity"="place_of_worship"](around:1000, ${lat}, ${lon});
-                  node["tourism"="viewpoint"](around:1000, ${lat}, ${lon});
-                  node["man_made"="torii"](around:1000, ${lat}, ${lon});
-                  node["highway"="street_lamp"](around:1000, ${lat}, ${lon});
-                );
-                out center;
-            `;
-            const url = "https://overpass-api.de/api/interpreter?data=" + encodeURIComponent(query);
-
-            try {
-                const res = await fetch(url);
-                const data = await res.json();
-                data.elements.forEach(el => {
-                    const elLat = el.lat || el.center.lat;
-                    const elLon = el.lon || el.center.lon;
-                    let type = "その他";
-                    let bg = "bg-osm";
-
-                    if(el.tags.highway === "steps") { type = "階段"; bg = "bg-steps"; }
-                    else if(el.tags.tourism === "viewpoint") { type = "絶景"; bg = "bg-view"; }
-                    else if(el.tags.amenity === "place_of_worship") { type = "神社仏閣"; bg = "bg-osm"; }
-
-                    addSpotToMap(elLat, elLon, type, el.tags.name || "名称なし", "OpenStreetMap", bg);
-                });
-                log(`🌍 OSM: ${data.elements.length}件`);
-            } catch(e) { log(`❌ OSMエラー: ${e.message}`); }
-        }
-
-        // --- API C: 呉市 (Data Platform Kure) 修正版 ---
-        async function fetchKureData(endpointId, label) {
-            if (KURE_API_KEY.includes("貼り付け")) {
-                log("⚠️ 呉市APIキーが設定されていません"); return;
-            }
-            log(`⚓️ 呉データ(${label})取得中...`);
-    
-            // ★修正1: 画像に基づいてURL構造を変更しました
-            const url = `https://api.expolis.cloud/opendata/t/kure/v1/${endpointId}`;
-    
-            try {
-                const res = await fetch(url, {
-                    headers: { 
-                        "Authorization": `Bearer ${KURE_API_KEY}`,
-                        "Content-Type": "application/json"
-                    }
-                });
-                if(!res.ok) throw new Error(`Status ${res.status}`);
-                const data = await res.json();
-
-                let count = 0;
-                data.forEach(item => {
-                    // ★修正2: 画像のレスポンスに合わせて 'long' もチェックするように追加
-                    const iLat = item.latitude || item.lat || item.Lat;
-                    const iLon = item.longitude || item.lon || item.Lon || item.long; 
-                    const iName = item.name || item.title || item.名称 || "名称不明";
-            
-                    if(iLat && iLon) {
-                        const dist = Math.sqrt(Math.pow(currentLat - iLat, 2) + Math.pow(currentLon - iLon, 2));
-                        if(dist < 0.015) { // 1.5km圏内
-                            addSpotToMap(iLat, iLon, label, iName, "KureOfficial", "bg-kure");
-                            count++;
-                        }
-                    }
-                });
-                log(`⚓️ ${label}: ${count}件(周辺)`);
-            } catch(e) { log(`❌ 呉APIエラー: ${e.message}`); }
-        }
-
-        function addSpotToMap(lat, lon, type, name, source, bgClass) {
-            gatheredSpots.push({ lat, lon, type, name, source });
-            const icon = L.divIcon({
-                className: '',
-                html: `<div class="custom-icon ${bgClass}" style="width:20px; height:20px;"></div>`,
-                iconSize: [20, 20]
-            });
-            L.marker([lat, lon], {icon: icon})
-             .bindPopup(`<b>${name}</b><br>${type}<br><small>${source}</small>`)
-             .addTo(markersLayer);
-        }
-
-        // --- 3. AIに聞く ---
-        async function askAI() {
-            const geminiKey = document.getElementById('gemini-key').value;
-            const mood = document.getElementById('user-mood').value;
-            
-            if(!geminiKey) { alert("Gemini APIキーを入力してください"); return; }
-            if(gatheredSpots.length === 0) { alert("周辺にスポットがありません"); return; }
-
-            document.getElementById('ai-response').innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> AIがルートを生成中...';
-
-            const spotsList = gatheredSpots
-                .sort(() => 0.5 - Math.random())
-                .slice(0, 30)
-                .map(s => `- [${s.source}] ${s.type}: ${s.name}`)
-                .join("\n");
-
-            const prompt = `
-あなたは呉市の観光ガイドです。以下のリアルタイムデータから散歩プランを作成してください。
-【状況】天気: ${weatherDescription} / 気分: ${mood}
-【周辺スポット】
-${spotsList}
-【指令】
-1. 天気に合う「散歩テーマ」
-2. [KureOfficial]を含む3つのルート提案
-3. 情緒的な解説
-`;
-
-            try {
-                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`;
-                const res = await fetch(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-                });
-                const result = await res.json();
-                const text = result.candidates[0].content.parts[0].text;
-                document.getElementById('ai-response').innerHTML = marked.parse(text);
-            } catch(e) {
-                document.getElementById('ai-response').innerHTML = "AIエラー: " + e.message;
-            }
-        }
-    </script>
+    <script src="script.js"></script>
 </body>
 </html>
