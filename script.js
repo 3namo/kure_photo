@@ -7,7 +7,7 @@ const KURE_API_KEY    = "a2620ef7-164e-467c-85c6-a51ca43f1fe5";
 // ★モデル名の設定 (7行目)
 // ここをご希望の "gemini-3-pro-preview" に変更しました。
 // もし動かない場合は "gemini-1.5-flash" に戻してください。
-const GEMINI_MODEL_NAME = "gemini-3-pro-preview"; 
+const GEMINI_MODEL_NAME = "gemini-2.5-flash"; 
 // ==========================================
 
 // グローバル変数
