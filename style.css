@@ -53,3 +53,58 @@ button:disabled { background: #ccc; cursor: not-allowed; }
 
 /* 呉市公式データ用 */
 .bg-kure    { background: #FF00FF; border: 2px solid yellow; }
+
+/* --- 天気ウィジェットのデザイン --- */
+#weather-widget {
+    background: #fff;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    border-left: 5px solid #007bff; /* アクセントカラー */
+}
+
+#current-status {
+    border-bottom: 1px solid #eee;
+    padding-bottom: 10px;
+    margin-bottom: 10px;
+}
+
+#clock {
+    font-size: 1.8em;
+    font-weight: bold;
+    color: #333;
+    font-family: monospace; /* デジタル時計っぽく */
+    text-align: center;
+    letter-spacing: 2px;
+}
+
+.weather-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+#weather-icon { width: 50px; height: 50px; }
+#weather-temp { font-size: 1.5em; font-weight: bold; color: #007bff; }
+#weather-desc { font-size: 0.9em; color: #666; }
+
+/* 未来の予報リスト */
+#forecast-container {
+    display: flex;
+    overflow-x: auto; /* 横スクロール可能に */
+    gap: 10px;
+    padding-bottom: 5px;
+}
+.forecast-item {
+    min-width: 60px;
+    text-align: center;
+    background: #f8f9fa;
+    padding: 5px;
+    border-radius: 4px;
+    font-size: 0.8em;
+}
+.forecast-time { font-weight: bold; color: #555; }
+.forecast-icon { width: 30px; height: 30px; display: block; margin: 0 auto; }
+.forecast-temp { color: #007bff; }
