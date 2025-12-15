@@ -4,8 +4,10 @@
 const WEATHER_API_KEY = "f5ced26dbed1c3f5d9ca115851dd4cce";
 const KURE_API_KEY    = "a2620ef7-164e-467c-85c6-a51ca43f1fe5";
 
-// ★モデル名: 万が一動かない場合は "gemini-1.5-flash" に戻してください
-const GEMINI_MODEL_NAME = "gemini-1.5-flash"; 
+// ★ モデル名設定
+// ご指定のモデル名に設定しました。
+// ※もしAPIエラー(404など)が出る場合は "gemini-1.5-flash" に戻してください。
+const GEMINI_MODEL_NAME = "gemini-3-pro-preview"; 
 // ==========================================
 
 // グローバル変数
@@ -19,8 +21,7 @@ let forecastText = "";
 
 // --- 1. 初期化処理 ---
 window.onload = function() {
-    // 設定のロード
-    loadSettings();
+    loadSettings(); // 設定の復元
 
     map = L.map('map').setView([34.248, 132.565], 14);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -33,14 +34,14 @@ window.onload = function() {
         await startExploration(e.latlng.lat, e.latlng.lng);
     });
 
-    // 入力監視 (自動保存)
+    // 入力欄の変更を監視して自動保存
     const inputs = document.querySelectorAll('input');
     inputs.forEach(input => {
         input.addEventListener('input', saveSettings);
     });
 };
 
-// --- ★便利機能: 設定の自動保存と復元 ---
+// --- ★設定の自動保存と復元 ---
 function saveSettings() {
     const settings = {
         geminiKey: document.getElementById('gemini-key').value,
@@ -70,7 +71,7 @@ function toggleSidebar() {
     sidebar.classList.toggle('closed');
 }
 
-// --- 時計の更新 ---
+// --- 時計更新 ---
 setInterval(() => {
     const now = new Date();
     const timeStr = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
@@ -259,7 +260,7 @@ async function askAI() {
 - 長文の説明は不要。
 
 【重要指令】
-回答は必ず以下のJSONフォーマットのみで行うこと。Markdownのコードブロック(```jsonなど)は不要。
+回答は必ず以下のJSONフォーマットのみで行うこと。Markdownのコードブロック(jsonなど)は不要。
 
 {
   "theme": "ルートの短いキャッチコピー (例: 雨上がりのレトロ階段巡り)",
@@ -322,7 +323,7 @@ function drawRouteOnMap(routePoints) {
         weight: 6,
         opacity: 0.9,
         dashArray: '10, 10', 
-        className: 'animated-route' // CSSアニメーションクラス
+        className: 'animated-route'
     }).addTo(routeLayer);
 
     map.fitBounds(polyline.getBounds(), { padding: [50, 50], maxZoom: 17 });

@@ -6,14 +6,14 @@ body { margin: 0; padding: 0; font-family: "Helvetica Neue", Arial, sans-serif; 
     width: 380px; background: #f8f9fa; padding: 20px;
     box-shadow: 2px 0 5px rgba(0,0,0,0.1);
     overflow-y: auto; z-index: 2000; display: flex; flex-direction: column;
-    position: relative;
+    position: relative; flex-shrink: 0;
     transition: transform 0.3s ease; /* 開閉アニメーション */
 }
 
 /* サイドバーが閉じている時のクラス */
 #sidebar.closed {
+    position: absolute;
     transform: translateX(-100%);
-    position: absolute; /* 地図の上に被さらないように */
     height: 100%;
 }
 
@@ -91,9 +91,10 @@ button#btn-search:disabled { background: #ccc; cursor: not-allowed; }
     box-shadow: 0 3px 5px rgba(0,0,0,0.4);
     border: 2px solid white; font-size: 14px;
 }
+/* カラー定義 */
 .bg-steps{background:#00BFFF}.bg-path{background:#87CEEB}.bg-shrine{background:#FF4500}.bg-temple{background:#800080}.bg-view{background:#32CD32}.bg-infra{background:#708090}.bg-retro{background:#8B4513}.bg-lamp{background:#FFD700;color:#333;border-color:#333}.bg-vending{background:#0000FF}.bg-manhole{background:#A9A9A9}.bg-kure{background:#FF00FF;border:2px solid yellow}
 
-/* --- ★ルート線の流れるアニメーション --- */
+/* --- ルート線のアニメーション --- */
 @keyframes dash-animation {
     0% { stroke-dashoffset: 0; }
     100% { stroke-dashoffset: -20; }
@@ -102,7 +103,7 @@ button#btn-search:disabled { background: #ccc; cursor: not-allowed; }
     animation: dash-animation 1s linear infinite;
 }
 
-/* --- レスポンシブ対応 (スマホ用) --- */
+/* スマホ対応 */
 @media (max-width: 600px) {
     #sidebar { width: 100%; position: absolute; height: 100%; }
     .mobile-only { display: block; }
