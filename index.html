@@ -14,8 +14,18 @@
 </head>
 <body>
 
+    <button id="sidebar-toggle" onclick="toggleSidebar()">
+        <i class="fa-solid fa-bars"></i>
+    </button>
+
     <div id="sidebar">
-        <h2>呉市探検AI（仮）</h2>
+        <div class="sidebar-header">
+            <h2>📡 Kure-AI Explorer</h2>
+            <button id="close-sidebar" onclick="toggleSidebar()" class="mobile-only">
+                <i class="fa-solid fa-times"></i>
+            </button>
+        </div>
+        
         <div id="weather-widget">
             <div id="current-status">
                 <div id="clock">--:--</div>
@@ -25,8 +35,7 @@
                     <span id="weather-desc">取得待ち...</span>
                 </div>
             </div>
-            <div id="forecast-container">
-                </div>
+            <div id="forecast-container"></div>
         </div>
         
         <div class="control-group">
@@ -50,6 +59,7 @@
         <div id="log-area">システムログ: 待機中...</div>
 
         <button id="btn-search" onclick="askAI()" disabled>AIにプランを聞く</button>
+        
         <div id="ai-response">地図をクリックすると探索を開始します。</div>
     </div>
 

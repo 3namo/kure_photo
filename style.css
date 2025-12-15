@@ -1,110 +1,109 @@
 /* --- レイアウト基本設定 --- */
-body { margin: 0; padding: 0; font-family: "Helvetica Neue", Arial, sans-serif; display: flex; height: 100vh; }
+body { margin: 0; padding: 0; font-family: "Helvetica Neue", Arial, sans-serif; display: flex; height: 100vh; overflow: hidden; }
 
-/* サイドバー */
+/* --- サイドバー --- */
 #sidebar {
     width: 380px; background: #f8f9fa; padding: 20px;
     box-shadow: 2px 0 5px rgba(0,0,0,0.1);
-    overflow-y: auto; z-index: 1000; display: flex; flex-direction: column;
+    overflow-y: auto; z-index: 2000; display: flex; flex-direction: column;
+    position: relative;
+    transition: transform 0.3s ease; /* 開閉アニメーション */
 }
 
-/* 地図 */
-#map { flex-grow: 1; height: 100%; cursor: crosshair; }
+/* サイドバーが閉じている時のクラス */
+#sidebar.closed {
+    transform: translateX(-100%);
+    position: absolute; /* 地図の上に被さらないように */
+    height: 100%;
+}
 
-/* フォーム部品 */
-h2 { margin-top: 0; color: #333; font-size: 1.5rem; }
+.sidebar-header {
+    display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;
+}
+
+/* 開閉ボタン */
+#sidebar-toggle {
+    position: absolute; top: 10px; left: 10px; z-index: 1500;
+    background: white; border: 2px solid #ccc; border-radius: 4px;
+    padding: 10px 15px; cursor: pointer; font-size: 1.2em;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+#sidebar-toggle:hover { background: #f0f0f0; }
+
+.mobile-only { display: none; background: none; border: none; font-size: 1.5em; color: #555; cursor: pointer; }
+
+/* --- 地図 --- */
+#map { flex-grow: 1; height: 100%; cursor: crosshair; z-index: 1; }
+
+/* --- フォーム部品 --- */
+h2 { margin: 0; color: #333; font-size: 1.5rem; }
 .control-group { margin-bottom: 15px; border-bottom: 1px solid #ddd; padding-bottom: 15px; }
 label { display: block; font-weight: bold; margin-bottom: 5px; color: #555; font-size: 0.9em; }
 .hint { font-size: 0.8em; color: #888; margin-bottom: 5px; }
 input { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; margin-bottom: 5px; }
 
 /* ボタン */
-button {
+button#btn-search {
     width: 100%; padding: 12px; background: #007bff; color: white;
     border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 1em; transition: 0.2s;
 }
-button:hover { background: #0056b3; }
-button:disabled { background: #ccc; cursor: not-allowed; }
+button#btn-search:hover { background: #0056b3; }
+button#btn-search:disabled { background: #ccc; cursor: not-allowed; }
 
-/* ログ・AI回答表示エリア */
+/* ログ表示エリア */
 #log-area { font-size: 0.8em; color: #666; margin-bottom: 10px; height: 60px; overflow-y: scroll; background: #eee; padding: 5px; border-radius: 4px;}
-#ai-response { flex-grow: 1; padding: 10px; background: white; border: 1px solid #ddd; border-radius: 4px; overflow-y: auto; font-size: 0.95em; line-height: 1.6; }
 
-/* --- アイコン装飾 (MapCSS再現) --- */
+/* --- 天気ウィジェット --- */
+#weather-widget {
+    background: #fff; border-radius: 8px; padding: 15px; margin-bottom: 20px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1); border-left: 5px solid #007bff;
+}
+#current-status { border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 10px; }
+#clock { font-size: 1.8em; font-weight: bold; color: #333; font-family: monospace; text-align: center; letter-spacing: 2px; }
+.weather-row { display: flex; align-items: center; justify-content: center; gap: 10px; }
+#weather-icon { width: 50px; height: 50px; }
+#weather-temp { font-size: 1.5em; font-weight: bold; color: #007bff; }
+#weather-desc { font-size: 0.9em; color: #666; }
+#forecast-container { display: flex; overflow-x: auto; gap: 10px; padding-bottom: 5px; }
+.forecast-item { min-width: 60px; text-align: center; background: #f8f9fa; padding: 5px; border-radius: 4px; font-size: 0.8em; }
+.forecast-time { font-weight: bold; color: #555; }
+.forecast-icon { width: 30px; height: 30px; display: block; margin: 0 auto; }
+.forecast-temp { color: #007bff; }
+
+/* --- AI回答エリア --- */
+#ai-response {
+    flex-grow: 1; padding: 10px; background: white; border: 1px solid #ddd;
+    border-radius: 4px; overflow-y: auto; font-size: 0.95em; line-height: 1.4;
+}
+.route-theme { font-size: 1.2em; font-weight: bold; color: #007bff; margin-bottom: 15px; text-align: center; border-bottom: 2px solid #007bff; padding-bottom:5px; }
+.route-step {
+    padding: 10px; margin-bottom: 10px; background: #f9f9f9;
+    border-left: 4px solid #ff4500; border-radius: 4px;
+}
+.step-name { font-weight: bold; font-size: 1.1em; margin-bottom: 5px; color: #333; }
+.step-photo { font-size: 0.9em; color: #555; }
+.step-photo i { color: #007bff; margin-right: 5px; }
+
+/* --- アイコン装飾 --- */
 .custom-icon {
     display: flex; justify-content: center; align-items: center;
     border-radius: 50%; color: white;
     box-shadow: 0 3px 5px rgba(0,0,0,0.4);
-    border: 2px solid white;
-    font-size: 14px;
+    border: 2px solid white; font-size: 14px;
+}
+.bg-steps{background:#00BFFF}.bg-path{background:#87CEEB}.bg-shrine{background:#FF4500}.bg-temple{background:#800080}.bg-view{background:#32CD32}.bg-infra{background:#708090}.bg-retro{background:#8B4513}.bg-lamp{background:#FFD700;color:#333;border-color:#333}.bg-vending{background:#0000FF}.bg-manhole{background:#A9A9A9}.bg-kure{background:#FF00FF;border:2px solid yellow}
+
+/* --- ★ルート線の流れるアニメーション --- */
+@keyframes dash-animation {
+    0% { stroke-dashoffset: 0; }
+    100% { stroke-dashoffset: -20; }
+}
+.animated-route {
+    animation: dash-animation 1s linear infinite;
 }
 
-/* カラーパレット (Overpass Turboの指定色) */
-.bg-steps   { background: #00BFFF; } /* 階段: Deep Sky Blue */
-.bg-path    { background: #87CEEB; } /* 路地: Sky Blue */
-.bg-shrine  { background: #FF4500; } /* 神社・鳥居: Orange Red */
-.bg-temple  { background: #800080; } /* お寺: Purple */
-.bg-view    { background: #32CD32; } /* 絶景: Lime Green */
-.bg-infra   { background: #708090; } /* インフラ: Slate Gray */
-.bg-retro   { background: #8B4513; } /* レトロ: Saddle Brown */
-.bg-lamp    { background: #FFD700; color: #333; border-color: #333; } /* 街灯 */
-.bg-vending { background: #0000FF; } /* 自販機: Blue */
-.bg-manhole { background: #A9A9A9; } /* マンホール: Dark Gray */
-
-/* 呉市公式データ用 */
-.bg-kure    { background: #FF00FF; border: 2px solid yellow; }
-
-/* --- 天気ウィジェットのデザイン --- */
-#weather-widget {
-    background: #fff;
-    border-radius: 8px;
-    padding: 15px;
-    margin-bottom: 20px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    border-left: 5px solid #007bff; /* アクセントカラー */
+/* --- レスポンシブ対応 (スマホ用) --- */
+@media (max-width: 600px) {
+    #sidebar { width: 100%; position: absolute; height: 100%; }
+    .mobile-only { display: block; }
 }
-
-#current-status {
-    border-bottom: 1px solid #eee;
-    padding-bottom: 10px;
-    margin-bottom: 10px;
-}
-
-#clock {
-    font-size: 1.8em;
-    font-weight: bold;
-    color: #333;
-    font-family: monospace; /* デジタル時計っぽく */
-    text-align: center;
-    letter-spacing: 2px;
-}
-
-.weather-row {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-}
-
-#weather-icon { width: 50px; height: 50px; }
-#weather-temp { font-size: 1.5em; font-weight: bold; color: #007bff; }
-#weather-desc { font-size: 0.9em; color: #666; }
-
-/* 未来の予報リスト */
-#forecast-container {
-    display: flex;
-    overflow-x: auto; /* 横スクロール可能に */
-    gap: 10px;
-    padding-bottom: 5px;
-}
-.forecast-item {
-    min-width: 60px;
-    text-align: center;
-    background: #f8f9fa;
-    padding: 5px;
-    border-radius: 4px;
-    font-size: 0.8em;
-}
-.forecast-time { font-weight: bold; color: #555; }
-.forecast-icon { width: 30px; height: 30px; display: block; margin: 0 auto; }
-.forecast-temp { color: #007bff; }
