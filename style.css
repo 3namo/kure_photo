@@ -1,27 +1,69 @@
 /* --- レイアウト基本設定 --- */
-body { margin: 0; padding: 0; font-family: "Helvetica Neue", Arial, sans-serif; display: flex; height: 100vh; overflow: hidden; }
+body { 
+    margin: 0; 
+    padding: 0; 
+    font-family: "Helvetica Neue", Arial, sans-serif; 
+    display: flex; 
+    height: 100vh; /* 画面全体の高さを固定 */
+    overflow: hidden; /* 画面全体としてのスクロールは禁止 */
+}
 
-/* --- サイドバー --- */
+/* --- サイドバー（ここがスクロールします） --- */
 #sidebar {
     width: 500px;
     background: #f8f9fa; 
     padding: 25px;
     box-shadow: 2px 0 5px rgba(0,0,0,0.1);
     
-    /* ★修正: 高さを画面いっぱいに固定し、はみ出た分をスクロールさせる設定 */
+    /* ★修正: スクロールバーを強制的に表示し、高さを画面に合わせる */
     height: 100vh; 
-    overflow-y: auto; 
-    box-sizing: border-box; /* paddingを含めたサイズ計算にする */
+    overflow-y: scroll; /* autoではなくscrollで常時表示 */
+    box-sizing: border-box; /* paddingを含めて高さを計算 */
 
-    z-index: 2000; display: flex; flex-direction: column;
-    position: relative; flex-shrink: 0;
+    /* Firefox用スクロールバー設定 */
+    scrollbar-width: thin;
+    scrollbar-color: #c1c1c1 #f1f1f1;
+
+    z-index: 2000; 
+    display: flex; 
+    flex-direction: column;
+    position: relative; 
+    flex-shrink: 0;
     transition: transform 0.3s ease;
 }
 
-#sidebar.closed { position: absolute; transform: translateX(-100%); height: 100%; }
-.sidebar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+#sidebar.closed { 
+    position: absolute; 
+    transform: translateX(-100%); 
+    height: 100%; 
+}
 
-/* 開閉ボタン */
+.sidebar-header { 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+    margin-bottom: 15px; 
+}
+
+/* --- Chrome/Edge/Safari用スクロールバーのカスタマイズ --- */
+#sidebar::-webkit-scrollbar {
+    width: 12px; /* 少し太くして押しやすくする */
+}
+#sidebar::-webkit-scrollbar-track {
+    background: #f1f1f1; 
+    border-radius: 6px;
+}
+#sidebar::-webkit-scrollbar-thumb {
+    background: #c1c1c1; 
+    border-radius: 6px;
+    border: 2px solid #f1f1f1; /* 枠線を付けて丸みを強調 */
+}
+#sidebar::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8; /* ホバー時に濃くする */
+}
+
+
+/* --- 開閉ボタン --- */
 #sidebar-toggle {
     position: absolute; top: 10px; left: 10px; z-index: 1500;
     background: white; border: 2px solid #ccc; border-radius: 4px;
@@ -152,9 +194,9 @@ button#btn-search:disabled { background: #ccc; cursor: not-allowed; box-shadow: 
 #ai-response {
     flex-grow: 1; 
     padding: 20px; 
-    padding-bottom: 40px; 
+    padding-bottom: 60px; /* ★修正: 一番下までスクロールしたときに余白を作る */
     background: white; 
-    max-height: 600px; /* 必要に応じて調整 */
+    max-height: 600px; 
     overflow-y: auto;
     font-size: 1em; line-height: 1.6;
 }
@@ -162,21 +204,4 @@ button#btn-search:disabled { background: #ccc; cursor: not-allowed; box-shadow: 
 @media (max-width: 600px) {
     #sidebar { width: 100%; position: absolute; height: 100%; }
     .mobile-only { display: block; }
-}
-
-/* ★追加: サイドバーのスクロールバーを太く・見やすくするカスタマイズ */
-#sidebar::-webkit-scrollbar {
-    width: 12px; /* 幅を太めに */
-}
-#sidebar::-webkit-scrollbar-track {
-    background: #f1f1f1; 
-    border-radius: 6px;
-}
-#sidebar::-webkit-scrollbar-thumb {
-    background: #c1c1c1; 
-    border-radius: 6px;
-    border: 3px solid #f1f1f1; /* 隙間を作って丸みを強調 */
-}
-#sidebar::-webkit-scrollbar-thumb:hover {
-    background: #a8a8a8; 
 }
