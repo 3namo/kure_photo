@@ -25,13 +25,13 @@ body { margin: 0; padding: 0; font-family: "Helvetica Neue", Arial, sans-serif; 
 
 .mobile-only { display: none; background: none; border: none; font-size: 1.5em; color: #555; cursor: pointer; }
 
-/* --- データセット開閉ヘッダー --- */
-.dataset-header {
+/* --- アコーディオンヘッダー (共通) --- */
+.accordion-header {
     display: flex; justify-content: space-between; align-items: center;
     cursor: pointer; padding: 8px 10px; background: #eee; border-radius: 4px;
-    font-weight: bold; color: #555;
+    font-weight: bold; color: #555; transition: background 0.2s;
 }
-.dataset-header:hover { background: #e0e0e0; }
+.accordion-header:hover { background: #e0e0e0; }
 
 /* --- 地図 --- */
 #map { flex-grow: 1; height: 100%; cursor: crosshair; z-index: 1; }
@@ -72,7 +72,11 @@ button#btn-search:disabled { background: #ccc; cursor: not-allowed; box-shadow: 
 
 /* --- AI回答エリア --- */
 #ai-response {
-    flex-grow: 1; padding: 20px; background: white; border: 1px solid #ddd;
+    flex-grow: 1; 
+    padding: 20px; 
+    /* ★修正: 下部にたっぷりと余白を持たせる */
+    padding-bottom: 60px; 
+    background: white; border: 1px solid #ddd;
     border-radius: 6px; overflow-y: auto; font-size: 1em; line-height: 1.6;
 }
 
@@ -96,7 +100,6 @@ button#btn-search:disabled { background: #ccc; cursor: not-allowed; box-shadow: 
 .step-photo { font-size: 0.95em; color: #666; display: flex; align-items: flex-start; }
 .step-photo i { color: #007bff; margin-right: 8px; margin-top: 4px; }
 
-/* --- アイコン --- */
 .custom-icon {
     display: flex; justify-content: center; align-items: center;
     border-radius: 50%; color: white;

@@ -47,7 +47,7 @@
         </div>
 
         <div class="control-group">
-            <div class="dataset-header" onclick="toggleDatasetInput()">
+            <div class="accordion-header" onclick="toggleDatasetInput()">
                 <label style="cursor:pointer; margin:0;">2. 呉市データセットID <small>(設定)</small></label>
                 <i id="dataset-arrow" class="fa-solid fa-chevron-down"></i>
             </div>
@@ -67,14 +67,20 @@
 
         <div class="control-group">
             <label>4. 所要時間 (分)</label>
-            <input type="number" id="walk-duration" placeholder="例: 60" value="60">
+            <input type="number" id="walk-duration" placeholder="例: 70" value="70">
             
             <label style="margin-top:10px;">5. ゴール地点 (任意)</label>
             <div class="hint">※空欄ならAIが良い場所を提案します</div>
             <input type="text" id="final-dest" placeholder="例: 呉駅、大和ミュージアム">
         </div>
 
-        <div id="log-area">システムログ: 待機中...</div>
+        <div class="control-group">
+            <div class="accordion-header" onclick="toggleLogArea()">
+                <label style="cursor:pointer; margin:0;">システムログ <small>(クリックで確認)</small></label>
+                <i id="log-arrow" class="fa-solid fa-chevron-down"></i>
+            </div>
+            <div id="log-area" style="display:none; margin-top:10px;">システムログ: 待機中...</div>
+        </div>
 
         <button id="btn-search" onclick="askAI()" disabled>AIにプランを聞く</button>
         

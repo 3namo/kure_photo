@@ -8,7 +8,6 @@ const KURE_API_KEY    = "a2620ef7-164e-467c-85c6-a51ca43f1fe5";
 const GEMINI_MODEL_NAME = "gemini-2.5-flash";
 // ==========================================
 
-// グローバル変数
 let map;
 let markersLayer = L.layerGroup();
 let routeLayer = L.layerGroup();
@@ -17,11 +16,9 @@ let gatheredSpots = [];
 let weatherDescription = "";
 let forecastText = ""; 
 
-// --- 1. 初期化処理 ---
 window.onload = function() {
     loadSettings();
 
-    // 地図の初期化
     map = L.map('map').setView([34.248, 132.565], 14);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors'
@@ -70,9 +67,23 @@ function toggleSidebar() {
     document.getElementById('sidebar').classList.toggle('closed');
 }
 
+// データセット欄の開閉
 function toggleDatasetInput() {
     const container = document.getElementById('dataset-container');
     const arrow = document.getElementById('dataset-arrow');
+    if(container.style.display === 'none') {
+        container.style.display = 'block';
+        arrow.className = 'fa-solid fa-chevron-up';
+    } else {
+        container.style.display = 'none';
+        arrow.className = 'fa-solid fa-chevron-down';
+    }
+}
+
+// ★新規追加: ログ欄の開閉
+function toggleLogArea() {
+    const container = document.getElementById('log-area');
+    const arrow = document.getElementById('log-arrow');
     if(container.style.display === 'none') {
         container.style.display = 'block';
         arrow.className = 'fa-solid fa-chevron-up';
@@ -107,6 +118,7 @@ async function startExploration(lat, lon) {
     
     document.getElementById('btn-search').disabled = true;
     document.getElementById('ai-response').innerHTML = "データ収集中...";
+    // ログはデフォルトで隠れているので、開かないと見えないが、裏では動いている
     document.getElementById('log-area').innerHTML = ""; 
     log(`📍 探索開始: ${lat.toFixed(4)}, ${lon.toFixed(4)}`);
 
@@ -254,19 +266,20 @@ async function askAI() {
     responseArea.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> AIがルートを計算中...';
     routeLayer.clearLayers();
 
-    // 高速化: 20件
+    // ★修正: 候補数を20→30に増やして、長距離ルートを作りやすくする
     const spotsListJson = gatheredSpots
         .sort(() => 0.5 - Math.random())
-        .slice(0, 20)
+        .slice(0, 30) 
         .map(s => ({ name: s.name, type: s.type, lat: s.lat, lon: s.lon }));
 
+    // ★修正: 時間をフル活用するよう指示を強化
     const prompt = `
 あなたは呉市のフォトスポットガイドです。
 以下のデータから、最も写真映えする散歩ルートを1つ作成してください。
 
 【条件】
 - 現在地からスタートすること。
-- 所要時間: 約${duration}分 (移動+撮影時間) で回れること。
+- 所要時間: ${duration}分を目安にしてください。移動と撮影を含めて、この時間を**最大限活用する**充実したルートにしてください。短時間で終わるルートはNGです。
 - ゴール地点: "${destination}" にすること。
 - 天気(${weatherDescription}, 予報:${forecastText})と気分(${mood})を考慮すること。
 - 長文の説明は不要。
@@ -345,11 +358,9 @@ async function drawSmartRoute(routePoints) {
             const route = data.routes[0];
             const coordinates = route.geometry.coordinates;
             
-            // 距離を取得
             distMeters = route.distance;
             
-            // ★時速4km固定で計算 (OSRMの時間は無視)
-            // 時間(分) = 距離(m) / 1000 / 4(km/h) * 60
+            // 時速4km固定で計算
             const speedKmh = 4.0;
             walkMinutes = Math.round((distMeters / 1000) / speedKmh * 60);
 
