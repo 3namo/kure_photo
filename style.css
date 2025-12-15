@@ -4,9 +4,16 @@ body { margin: 0; padding: 0; font-family: "Helvetica Neue", Arial, sans-serif; 
 /* --- サイドバー --- */
 #sidebar {
     width: 500px;
-    background: #f8f9fa; padding: 25px;
+    background: #f8f9fa; 
+    padding: 25px;
     box-shadow: 2px 0 5px rgba(0,0,0,0.1);
-    overflow-y: auto; z-index: 2000; display: flex; flex-direction: column;
+    
+    /* ★修正: 高さを画面いっぱいに固定し、はみ出た分をスクロールさせる設定 */
+    height: 100vh; 
+    overflow-y: auto; 
+    box-sizing: border-box; /* paddingを含めたサイズ計算にする */
+
+    z-index: 2000; display: flex; flex-direction: column;
     position: relative; flex-shrink: 0;
     transition: transform 0.3s ease;
 }
@@ -100,7 +107,7 @@ button#btn-search:disabled { background: #ccc; cursor: not-allowed; box-shadow: 
 }
 .bg-steps{background:#00BFFF}.bg-path{background:#87CEEB}.bg-shrine{background:#FF4500}.bg-temple{background:#800080}.bg-view{background:#32CD32}.bg-infra{background:#708090}.bg-retro{background:#8B4513}.bg-lamp{background:#FFD700;color:#333;border-color:#333}.bg-vending{background:#0000FF}.bg-manhole{background:#A9A9A9}.bg-kure{background:#FF00FF;border:2px solid yellow}
 
-/* ★改善箇所: 新しいアコーディオン(details/summary)用のスタイル */
+/* アコーディオン(details/summary)用のスタイル */
 .ai-accordion {
     margin-top: 15px;
     border: 1px solid #ddd;
@@ -147,7 +154,7 @@ button#btn-search:disabled { background: #ccc; cursor: not-allowed; box-shadow: 
     padding: 20px; 
     padding-bottom: 40px; 
     background: white; 
-    max-height: 600px; /* スクロール制限 */
+    max-height: 600px; /* 必要に応じて調整 */
     overflow-y: auto;
     font-size: 1em; line-height: 1.6;
 }
@@ -155,4 +162,21 @@ button#btn-search:disabled { background: #ccc; cursor: not-allowed; box-shadow: 
 @media (max-width: 600px) {
     #sidebar { width: 100%; position: absolute; height: 100%; }
     .mobile-only { display: block; }
+}
+
+/* ★追加: サイドバーのスクロールバーを太く・見やすくするカスタマイズ */
+#sidebar::-webkit-scrollbar {
+    width: 12px; /* 幅を太めに */
+}
+#sidebar::-webkit-scrollbar-track {
+    background: #f1f1f1; 
+    border-radius: 6px;
+}
+#sidebar::-webkit-scrollbar-thumb {
+    background: #c1c1c1; 
+    border-radius: 6px;
+    border: 3px solid #f1f1f1; /* 隙間を作って丸みを強調 */
+}
+#sidebar::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8; 
 }
