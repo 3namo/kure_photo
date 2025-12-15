@@ -38,7 +38,6 @@ window.onload = function() {
     });
 };
 
-// --- 設定の自動保存と復元 ---
 function saveSettings() {
     const settings = {
         geminiKey: document.getElementById('gemini-key').value,
@@ -302,8 +301,7 @@ ${JSON.stringify(spotsListJson)}
         text = text.replace(/^```json\s*/, "").replace(/\s*```$/, "");
 
         const routeData = JSON.parse(text);
-        
-        // ★後でOSRMの距離データと合体させるために保存
+        // ★データ保存
         window.lastRouteData = routeData;
 
         log("🗺️ ルートデータを受信。ナビゲーション取得中...");
@@ -317,7 +315,7 @@ ${JSON.stringify(spotsListJson)}
     }
 }
 
-// --- ★OSRMを使って道なりのルートを引く (グラデーション+矢印+距離時間) ---
+// --- ★OSRMを使って道なりのルートを引く (矢印+距離時間) ---
 async function drawSmartRoute(routePoints) {
     if(!routePoints || routePoints.length === 0) return;
 
@@ -358,24 +356,19 @@ async function drawSmartRoute(routePoints) {
                 palette: { 0.0: '#0000ff', 0.5: '#ff00ff', 1.0: '#ff0000' }
             }).addTo(routeLayer);
 
-            // 2. 矢印を描画 (透明な線の上に矢印を配置)
+            // 2. 矢印を描画
             const arrowLine = L.polyline(coordinates.map(c => [c[1], c[0]]), {
-                color: 'transparent', 
-                weight: 0
+                color: 'transparent', weight: 0
             }).addTo(routeLayer);
 
             arrowLine.arrowheads({
-                size: '15px',
-                frequency: '80px',
-                fill: true,
-                color: '#ff4500',
-                offsets: { end: "10px" }
+                size: '15px', frequency: '80px', fill: true, color: '#ff4500', offsets: { end: "10px" }
             });
 
             map.fitBounds(hotline.getBounds(), { padding: [50, 50], maxZoom: 17 });
             addRouteMarkers(routePoints);
             
-            // ★距離・時間情報を渡してサイドバーを表示
+            // 距離・時間情報を渡してサイドバーを表示
             renderRouteSidebar({ 
                 ...window.lastRouteData, 
                 distance: distMeters, 
@@ -387,8 +380,14 @@ async function drawSmartRoute(routePoints) {
             const fallbackLine = waypoints.map(p => [p[1], p[0]]);
             L.polyline(fallbackLine, { color: 'red', dashArray: '5,5' }).addTo(routeLayer);
             addRouteMarkers(routePoints);
-            // フォールバック表示（距離なし）
-            renderRouteSidebar({ ...window.lastRouteData, distance: 0, duration: 0 });
+            
+            // 直線距離の簡易計算 (フォールバック)
+            let totalDist = 0;
+            for(let i=0; i<waypoints.length-1; i++) {
+                totalDist += map.distance([waypoints[i][1], waypoints[i][0]], [waypoints[i+1][1], waypoints[i+1][0]]);
+            }
+            // 距離ありで表示
+            renderRouteSidebar({ ...window.lastRouteData, distance: totalDist, duration: totalDist / 1.1 }); // 1.1m/sで概算
         }
     } catch (e) {
         console.error("OSRM Error:", e);
@@ -424,23 +423,17 @@ function renderRouteSidebar(data) {
     const responseArea = document.getElementById('ai-response');
     
     // 距離と時間のフォーマット
-    const distStr = (data.distance !== undefined) ? (data.distance / 1000).toFixed(1) + " km" : "計測中...";
-    const timeStr = (data.duration !== undefined) ? Math.round(data.duration / 60) + " 分" : "計測中...";
+    const distStr = (data.distance !== undefined) ? (data.distance / 1000).toFixed(1) + " km" : "-- km";
+    const timeStr = (data.duration !== undefined) ? Math.round(data.duration / 60) + " 分" : "-- 分";
 
-    let html = `
-        <div class="route-summary">
-            <div class="summary-item">
-                <i class="fa-solid fa-person-walking"></i>
-                <span>${distStr}</span>
-                <span class="summary-label">総距離</span>
-            </div>
-            <div class="summary-item">
-                <i class="fa-solid fa-clock"></i>
-                <span>${timeStr}</span>
-                <span class="summary-label">移動時間</span>
-            </div>
+    let html = `<div class="route-theme">“ ${data.theme} ”</div>`;
+    
+    // シンプルな距離表示 (タイトルの下)
+    html += `
+        <div class="route-meta">
+            <i class="fa-solid fa-person-walking"></i> <span>${distStr}</span> / 
+            <i class="fa-solid fa-clock"></i> <span>${timeStr}</span>
         </div>
-        <div class="route-theme">“ ${data.theme} ”</div>
     `;
     
     data.route.forEach((step, index) => {

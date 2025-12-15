@@ -1,9 +1,9 @@
 /* --- レイアウト基本設定 --- */
 body { margin: 0; padding: 0; font-family: "Helvetica Neue", Arial, sans-serif; display: flex; height: 100vh; overflow: hidden; }
 
-/* --- サイドバー (幅を広げました) --- */
+/* --- サイドバー --- */
 #sidebar {
-    width: 460px; /* ★ここを広げました (元380px) */
+    width: 420px; /* 見やすい幅に調整 */
     background: #f8f9fa; padding: 20px;
     box-shadow: 2px 0 5px rgba(0,0,0,0.1);
     overflow-y: auto; z-index: 2000; display: flex; flex-direction: column;
@@ -60,38 +60,34 @@ button#btn-search:disabled { background: #ccc; cursor: not-allowed; }
 .forecast-icon { width: 30px; height: 30px; display: block; margin: 0 auto; }
 .forecast-temp { color: #007bff; }
 
-/* --- AI回答エリア --- */
+/* --- AI回答エリア (シンプルに戻しました) --- */
 #ai-response {
     flex-grow: 1; padding: 15px; background: white; border: 1px solid #ddd;
     border-radius: 4px; overflow-y: auto; font-size: 0.95em; line-height: 1.5;
 }
 
-/* ★距離・時間のサマリー表示 */
-.route-summary {
-    display: flex; justify-content: space-around; align-items: center;
-    background: #eef5ff; padding: 15px 10px; border-radius: 8px;
-    margin-bottom: 20px; border: 1px solid #cce5ff;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-}
-.summary-item {
-    font-size: 1.2em; font-weight: bold; color: #0056b3;
-    display: flex; flex-direction: column; align-items: center;
-}
-.summary-item i { font-size: 1.4em; margin-bottom: 5px; color: #007bff; }
-.summary-label { font-size: 0.7em; color: #666; font-weight: normal; }
-
 .route-theme { 
-    font-size: 1.3em; font-weight: bold; color: #333; margin-bottom: 20px; 
-    text-align: center; padding-bottom: 10px; border-bottom: 2px solid #eee; 
+    font-size: 1.2em; font-weight: bold; color: #333; margin-bottom: 5px; 
+    text-align: center; 
 }
+/* 距離・時間表示のバッジ */
+.route-meta {
+    text-align: center; margin-bottom: 15px; color: #666; font-size: 0.9em;
+    padding-bottom: 10px; border-bottom: 1px solid #eee;
+}
+.route-meta span {
+    background: #eef5ff; color: #007bff; padding: 3px 8px; border-radius: 10px;
+    margin: 0 5px; font-weight: bold;
+}
+
 .route-step {
-    padding: 15px; margin-bottom: 15px; background: #fff;
-    border-left: 5px solid #ff4500; border-radius: 4px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    padding: 10px; margin-bottom: 10px; background: #fff;
+    border-left: 4px solid #ff4500; border-radius: 4px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
 }
-.step-name { font-weight: bold; font-size: 1.1em; margin-bottom: 8px; color: #333; }
-.step-photo { font-size: 0.95em; color: #555; display: flex; align-items: flex-start; }
-.step-photo i { color: #007bff; margin-right: 8px; margin-top: 3px; }
+.step-name { font-weight: bold; font-size: 1.05em; margin-bottom: 5px; color: #333; }
+.step-photo { font-size: 0.9em; color: #555; display: flex; align-items: flex-start; }
+.step-photo i { color: #007bff; margin-right: 5px; margin-top: 3px; }
 
 /* --- アイコン --- */
 .custom-icon {
