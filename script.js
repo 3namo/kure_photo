@@ -17,10 +17,8 @@ let gatheredSpots = [];
 let weatherDescription = "";
 let forecastText = ""; 
 
-// --- 1. 初期化処理 ---
 window.onload = function() {
     loadSettings();
-
     map = L.map('map').setView([34.248, 132.565], 14);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors'
@@ -66,8 +64,20 @@ function loadSettings() {
 }
 
 function toggleSidebar() {
-    const sidebar = document.getElementById('sidebar');
-    sidebar.classList.toggle('closed');
+    document.getElementById('sidebar').classList.toggle('closed');
+}
+
+// ★新規追加: データセット欄の開閉
+function toggleDatasetInput() {
+    const container = document.getElementById('dataset-container');
+    const arrow = document.getElementById('dataset-arrow');
+    if(container.style.display === 'none') {
+        container.style.display = 'block';
+        arrow.className = 'fa-solid fa-chevron-up';
+    } else {
+        container.style.display = 'none';
+        arrow.className = 'fa-solid fa-chevron-down';
+    }
 }
 
 setInterval(() => {
@@ -85,7 +95,6 @@ function log(msg) {
     }
 }
 
-// --- 2. 探索メイン処理 ---
 async function startExploration(lat, lon) {
     currentLat = lat; currentLon = lon;
     gatheredSpots = [];
@@ -117,7 +126,6 @@ async function startExploration(lat, lon) {
     document.getElementById('ai-response').innerHTML = `データ収集完了！<br>現在の天気: ${weatherDescription}<br>発見スポット: ${gatheredSpots.length}件<br>「AIにプランを聞く」を押してください。`;
 }
 
-// --- API A: 天気予報 ---
 async function fetchWeather(lat, lon) {
     if (WEATHER_API_KEY.includes("貼り付け")) { log("⚠️ OpenWeatherキー未設定"); return; }
     try {
@@ -167,7 +175,6 @@ async function fetchWeather(lat, lon) {
     }
 }
 
-// --- API B: OSM ---
 async function fetchOverpass(lat, lon) {
     log("🌍 OSMデータ検索中(特盛り)...");
     const query = `[out:json][timeout:30];(way["highway"="steps"](around:1000,${lat},${lon});way["highway"="path"](around:1000,${lat},${lon});node["amenity"="place_of_worship"](around:1000,${lat},${lon});node["man_made"="torii"](around:1000,${lat},${lon});node["tourism"="viewpoint"](around:1000,${lat},${lon});node["man_made"="crane"](around:1000,${lat},${lon});way["man_made"="bridge"](around:1000,${lat},${lon});node["historic"](around:1000,${lat},${lon});way["building:material"="brick"](around:1000,${lat},${lon});way["barrier"="retaining_wall"](around:1000,${lat},${lon});node["highway"="street_lamp"](around:1000,${lat},${lon});node["amenity"="vending_machine"](around:1000,${lat},${lon});node["man_made"="manhole"](around:1000,${lat},${lon}););out center;`;
@@ -195,7 +202,6 @@ async function fetchOverpass(lat, lon) {
     } catch(e) { log(`❌ OSMエラー: ${e.message}`); }
 }
 
-// --- API C: 呉市データ ---
 async function fetchKureData(endpointId, label) {
     if (KURE_API_KEY.includes("貼り付け")) { log("⚠️ 呉市キー未設定"); return; }
     log(`⚓️ 呉データ(${label})取得中...`);
@@ -233,7 +239,6 @@ function addSpotToMap(lat, lon, type, name, source, bgClass, iconClass="fa-map-p
         .addTo(markersLayer);
 }
 
-// --- 3. AIに聞く ---
 async function askAI() {
     const geminiKey = document.getElementById('gemini-key').value;
     const mood = document.getElementById('user-mood').value;
@@ -247,7 +252,10 @@ async function askAI() {
     responseArea.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> AIがルートを計算中...';
     routeLayer.clearLayers();
 
-    const spotsListJson = gatheredSpots.sort(() => 0.5 - Math.random()).slice(0, 40)
+    // ★高速化の修正: 候補数を40→20に減らす
+    const spotsListJson = gatheredSpots
+        .sort(() => 0.5 - Math.random())
+        .slice(0, 20) // 20件に制限
         .map(s => ({ name: s.name, type: s.type, lat: s.lat, lon: s.lon }));
 
     const prompt = `
@@ -301,11 +309,9 @@ ${JSON.stringify(spotsListJson)}
         text = text.replace(/^```json\s*/, "").replace(/\s*```$/, "");
 
         const routeData = JSON.parse(text);
-        // ★データ保存
         window.lastRouteData = routeData;
 
         log("🗺️ ルートデータを受信。ナビゲーション取得中...");
-        
         await drawSmartRoute(routeData.route);
 
     } catch(e) {
@@ -315,7 +321,6 @@ ${JSON.stringify(spotsListJson)}
     }
 }
 
-// --- ★OSRMを使って道なりのルートを引く (矢印+距離時間) ---
 async function drawSmartRoute(routePoints) {
     if(!routePoints || routePoints.length === 0) return;
 
@@ -331,7 +336,6 @@ async function drawSmartRoute(routePoints) {
         const res = await fetch(osrmUrl);
         const data = await res.json();
 
-        // 距離と時間の初期値
         let distMeters = 0;
         let durSeconds = 0;
 
@@ -339,16 +343,13 @@ async function drawSmartRoute(routePoints) {
             const route = data.routes[0];
             const coordinates = route.geometry.coordinates;
             
-            // ★OSRMから距離と時間を取得
             distMeters = route.distance; 
             durSeconds = route.duration;
 
-            // グラデーション用のデータ
             const hotlineData = coordinates.map((c, index) => [
                 c[1], c[0], index / (coordinates.length - 1)
             ]);
 
-            // 1. グラデーション線
             const hotline = L.hotline(hotlineData, {
                 weight: 6,
                 outlineWidth: 1,
@@ -356,7 +357,6 @@ async function drawSmartRoute(routePoints) {
                 palette: { 0.0: '#0000ff', 0.5: '#ff00ff', 1.0: '#ff0000' }
             }).addTo(routeLayer);
 
-            // 2. 矢印を描画
             const arrowLine = L.polyline(coordinates.map(c => [c[1], c[0]]), {
                 color: 'transparent', weight: 0
             }).addTo(routeLayer);
@@ -368,7 +368,6 @@ async function drawSmartRoute(routePoints) {
             map.fitBounds(hotline.getBounds(), { padding: [50, 50], maxZoom: 17 });
             addRouteMarkers(routePoints);
             
-            // 距離・時間情報を渡してサイドバーを表示
             renderRouteSidebar({ 
                 ...window.lastRouteData, 
                 distance: distMeters, 
@@ -376,24 +375,15 @@ async function drawSmartRoute(routePoints) {
             });
 
         } else {
-            console.warn("OSRMルート取得失敗。直線を引きます。");
-            const fallbackLine = waypoints.map(p => [p[1], p[0]]);
-            L.polyline(fallbackLine, { color: 'red', dashArray: '5,5' }).addTo(routeLayer);
+            console.warn("OSRMルート取得失敗。");
+            // ★修正: 赤い点線の描画コードを削除
             addRouteMarkers(routePoints);
-            
-            // 直線距離の簡易計算 (フォールバック)
-            let totalDist = 0;
-            for(let i=0; i<waypoints.length-1; i++) {
-                totalDist += map.distance([waypoints[i][1], waypoints[i][0]], [waypoints[i+1][1], waypoints[i+1][0]]);
-            }
-            // 距離ありで表示
-            renderRouteSidebar({ ...window.lastRouteData, distance: totalDist, duration: totalDist / 1.1 }); // 1.1m/sで概算
+            renderRouteSidebar({ ...window.lastRouteData, distance: 0, duration: 0 });
         }
     } catch (e) {
         console.error("OSRM Error:", e);
         log("⚠️ 道案内データの取得に失敗しました");
-        const fallbackLine = waypoints.map(p => [p[1], p[0]]);
-        L.polyline(fallbackLine, { color: 'red', dashArray: '5,5' }).addTo(routeLayer);
+        // ★修正: 赤い点線の描画コードを削除
         addRouteMarkers(routePoints);
     }
 }
@@ -418,17 +408,14 @@ function addRouteMarkers(routePoints) {
     });
 }
 
-// --- ★距離・時間を表示するように更新 ---
 function renderRouteSidebar(data) {
     const responseArea = document.getElementById('ai-response');
     
-    // 距離と時間のフォーマット
     const distStr = (data.distance !== undefined) ? (data.distance / 1000).toFixed(1) + " km" : "-- km";
     const timeStr = (data.duration !== undefined) ? Math.round(data.duration / 60) + " 分" : "-- 分";
 
     let html = `<div class="route-theme">“ ${data.theme} ”</div>`;
     
-    // シンプルな距離表示 (タイトルの下)
     html += `
         <div class="route-meta">
             <i class="fa-solid fa-person-walking"></i> <span>${distStr}</span> / 
