@@ -4,9 +4,7 @@
 const WEATHER_API_KEY = "f5ced26dbed1c3f5d9ca115851dd4cce";
 const KURE_API_KEY    = "a2620ef7-164e-467c-85c6-a51ca43f1fe5";
 
-// ★ モデル名設定
-// ご指定のモデル名に設定しました。
-// ※もしAPIエラー(404など)が出る場合は "gemini-1.5-flash" に戻してください。
+// ★モデル名: あなたの環境で動作するモデル名を設定してください
 const GEMINI_MODEL_NAME = "gemini-2.5-flash"; 
 // ==========================================
 
@@ -34,14 +32,14 @@ window.onload = function() {
         await startExploration(e.latlng.lat, e.latlng.lng);
     });
 
-    // 入力欄の変更を監視して自動保存
+    // 入力監視 (自動保存)
     const inputs = document.querySelectorAll('input');
     inputs.forEach(input => {
         input.addEventListener('input', saveSettings);
     });
 };
 
-// --- ★設定の自動保存と復元 ---
+// --- 設定の自動保存と復元 ---
 function saveSettings() {
     const settings = {
         geminiKey: document.getElementById('gemini-key').value,
@@ -235,7 +233,7 @@ function addSpotToMap(lat, lon, type, name, source, bgClass, iconClass="fa-map-p
         .addTo(markersLayer);
 }
 
-// --- 3. AIに聞く (JSON & アニメーションルート対応) ---
+// --- 3. AIに聞く ---
 async function askAI() {
     const geminiKey = document.getElementById('gemini-key').value;
     const mood = document.getElementById('user-mood').value;
@@ -260,16 +258,16 @@ async function askAI() {
 - 長文の説明は不要。
 
 【重要指令】
-回答は必ず以下のJSONフォーマットのみで行うこと。Markdownのコードブロック(jsonなど)は不要。
+回答は必ず以下のJSONフォーマットのみで行うこと。Markdownのコードブロックは不要。
 
 {
-  "theme": "ルートの短いキャッチコピー (例: 雨上がりのレトロ階段巡り)",
+  "theme": "ルートの短いキャッチコピー",
   "route": [
     {
-      "name": "スポット名1 (現在地に近い場所)",
+      "name": "スポット名1",
       "lat": 緯度(数値),
       "lon": 経度(数値),
-      "photo_tip": "ここで撮るべき写真の具体的で短いヒント"
+      "photo_tip": "写真のヒント"
     },
     {
       "name": "スポット名2",
@@ -299,34 +297,90 @@ ${JSON.stringify(spotsListJson)}
         text = text.replace(/^```json\s*/, "").replace(/\s*```$/, "");
 
         const routeData = JSON.parse(text);
-        log("🗺️ ルートデータを受信しました。");
+        log("🗺️ ルートデータを受信。ナビゲーション取得中...");
         
-        drawRouteOnMap(routeData.route);
+        // ★修正ポイント: OSRMで道なりのルートを取得・描画
+        await drawSmartRoute(routeData.route);
         renderRouteSidebar(routeData);
 
     } catch(e) {
         console.error(e);
-        responseArea.innerHTML = `<div style="color:red; font-weight:bold;">ルート生成エラー</div><small>${e.message}</small><br><small>※AIが正しいデータを返せませんでした。もう一度試してみてください。</small>`;
+        responseArea.innerHTML = `<div style="color:red; font-weight:bold;">ルート生成エラー</div><small>${e.message}</small>`;
         log(`❌ エラー: ${e.message}`);
     }
 }
 
-// --- ★アニメーション付きルート描画 ---
-function drawRouteOnMap(routePoints) {
+// --- ★新規追加: OSRMを使って道なりのルートを引く ---
+async function drawSmartRoute(routePoints) {
     if(!routePoints || routePoints.length === 0) return;
 
-    const latlngs = routePoints.map(p => [p.lat, p.lon]);
-    latlngs.unshift([currentLat, currentLon]);
+    // 経由点の座標文字列を作成 (lon,lat;lon,lat...)
+    // OSRMは [経度, 緯度] の順序であることに注意！
+    const waypoints = [
+        [currentLon, currentLat], // スタート地点
+        ...routePoints.map(p => [p.lon, p.lat])
+    ];
 
-    const polyline = L.polyline(latlngs, {
-        color: '#ff4500',
-        weight: 6,
-        opacity: 0.9,
-        dashArray: '10, 10', 
-        className: 'animated-route'
-    }).addTo(routeLayer);
+    // 座標を文字列に変換
+    const coordsString = waypoints.map(pt => pt.join(',')).join(';');
 
-    map.fitBounds(polyline.getBounds(), { padding: [50, 50], maxZoom: 17 });
+    // OSRM API (徒歩モード) を呼び出し
+    const osrmUrl = `https://router.project-osrm.org/route/v1/walking/${coordsString}?overview=full&geometries=geojson`;
+
+    try {
+        const res = await fetch(osrmUrl);
+        const data = await res.json();
+
+        if (data.routes && data.routes.length > 0) {
+            const geometry = data.routes[0].geometry;
+            
+            // GeoJSONの座標 ([lon, lat]) を Leaflet用 ([lat, lon]) に変換
+            const latlngs = geometry.coordinates.map(c => [c[1], c[0]]);
+
+            // 道なりの線を引く
+            const polyline = L.polyline(latlngs, {
+                color: '#ff4500',
+                weight: 6,
+                opacity: 0.8,
+                dashArray: '10, 10', 
+                className: 'animated-route'
+            }).addTo(routeLayer);
+
+            map.fitBounds(polyline.getBounds(), { padding: [50, 50], maxZoom: 17 });
+            
+            // ★重なり対策: ルート上に番号付きマーカーを追加
+            addRouteMarkers(routePoints);
+        } else {
+            // ルートが見つからない場合は直線を引く (フォールバック)
+            console.warn("OSRMルート取得失敗。直線を引きます。");
+            const fallbackLine = waypoints.map(p => [p[1], p[0]]);
+            L.polyline(fallbackLine, { color: 'red', dashArray: '5,5' }).addTo(routeLayer);
+        }
+    } catch (e) {
+        console.error("OSRM Error:", e);
+        log("⚠️ 道案内データの取得に失敗しました");
+    }
+}
+
+// --- ★新規追加: ルート番号マーカーを表示 ---
+function addRouteMarkers(routePoints) {
+    routePoints.forEach((pt, index) => {
+        const numIcon = L.divIcon({
+            className: '',
+            html: `<div style="
+                background: #ff4500; color: white; border-radius: 50%; 
+                width: 24px; height: 24px; text-align: center; line-height: 24px;
+                font-weight: bold; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">
+                ${index + 1}
+            </div>`,
+            iconSize: [28, 28],
+            iconAnchor: [14, 28] // ピンの足元ではなく中心〜下に合わせる
+        });
+
+        L.marker([pt.lat, pt.lon], { icon: numIcon, zIndexOffset: 1000 })
+            .bindPopup(`<b>Step ${index+1}</b><br>${pt.name}`)
+            .addTo(routeLayer);
+    });
 }
 
 function renderRouteSidebar(data) {
@@ -340,6 +394,6 @@ function renderRouteSidebar(data) {
             </div>
         `;
     });
-    html += `<small style="color:#666;">※地図上の赤い点線が推奨ルートです。</small>`;
+    html += `<small style="color:#666;">※赤い点線が実際の道順です。</small>`;
     responseArea.innerHTML = html;
 }
