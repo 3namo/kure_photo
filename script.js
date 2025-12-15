@@ -67,7 +67,6 @@ function toggleSidebar() {
     document.getElementById('sidebar').classList.toggle('closed');
 }
 
-// データセット欄の開閉
 function toggleDatasetInput() {
     const container = document.getElementById('dataset-container');
     const arrow = document.getElementById('dataset-arrow');
@@ -80,7 +79,6 @@ function toggleDatasetInput() {
     }
 }
 
-// ★新規追加: ログ欄の開閉
 function toggleLogArea() {
     const container = document.getElementById('log-area');
     const arrow = document.getElementById('log-arrow');
@@ -118,7 +116,11 @@ async function startExploration(lat, lon) {
     
     document.getElementById('btn-search').disabled = true;
     document.getElementById('ai-response').innerHTML = "データ収集中...";
-    // ログはデフォルトで隠れているので、開かないと見えないが、裏では動いている
+    
+    // ★改善箇所: 探索開始時はアコーディオンを閉じる（画面をすっきりさせる）
+    const detailsElement = document.getElementById('ai-result-details');
+    if(detailsElement) detailsElement.open = false;
+
     document.getElementById('log-area').innerHTML = ""; 
     log(`📍 探索開始: ${lat.toFixed(4)}, ${lon.toFixed(4)}`);
 
@@ -262,17 +264,19 @@ async function askAI() {
     if(!geminiKey) { alert("Gemini APIキーを入力してください"); return; }
     if(gatheredSpots.length === 0) { alert("周辺にスポットがありません"); return; }
 
+    // ★改善箇所: ボタンを押したら強制的にアコーディオンを開く
+    const detailsElement = document.getElementById('ai-result-details');
+    if(detailsElement) detailsElement.open = true;
+
     const responseArea = document.getElementById('ai-response');
     responseArea.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> AIがルートを計算中...';
     routeLayer.clearLayers();
 
-    // ★修正: 候補数を20→30に増やして、長距離ルートを作りやすくする
     const spotsListJson = gatheredSpots
         .sort(() => 0.5 - Math.random())
         .slice(0, 30) 
         .map(s => ({ name: s.name, type: s.type, lat: s.lat, lon: s.lon }));
 
-    // ★修正: 時間をフル活用するよう指示を強化
     const prompt = `
 あなたは呉市のフォトスポットガイドです。
 以下のデータから、最も写真映えする散歩ルートを1つ作成してください。
@@ -327,10 +331,16 @@ ${JSON.stringify(spotsListJson)}
         window.lastRouteData = routeData;
 
         log("🗺️ ルートデータを受信。ナビゲーション取得中...");
+        
+        // 念のためここでも開く
+        if(detailsElement) detailsElement.open = true;
+
         await drawSmartRoute(routeData.route);
 
     } catch(e) {
         console.error(e);
+        // エラー時も見せる
+        if(detailsElement) detailsElement.open = true;
         responseArea.innerHTML = `<div style="color:red; font-weight:bold;">ルート生成エラー</div><small>${e.message}</small>`;
         log(`❌ エラー: ${e.message}`);
     }
@@ -360,7 +370,6 @@ async function drawSmartRoute(routePoints) {
             
             distMeters = route.distance;
             
-            // 時速4km固定で計算
             const speedKmh = 4.0;
             walkMinutes = Math.round((distMeters / 1000) / speedKmh * 60);
 
