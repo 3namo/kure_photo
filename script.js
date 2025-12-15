@@ -4,7 +4,7 @@
 const WEATHER_API_KEY = "f5ced26dbed1c3f5d9ca115851dd4cce";
 const KURE_API_KEY    = "a2620ef7-164e-467c-85c6-a51ca43f1fe5";
 
-// ★モデル名: ご指定通り gemini-2.5-flash に統一します
+// ★モデル名: gemini-2.5-flash
 const GEMINI_MODEL_NAME = "gemini-2.5-flash";
 // ==========================================
 
@@ -38,14 +38,17 @@ window.onload = function() {
     });
 };
 
-// --- 設定の自動保存と復元 ---
+// --- 設定の自動保存と復元 (項目追加) ---
 function saveSettings() {
     const settings = {
         geminiKey: document.getElementById('gemini-key').value,
         mood: document.getElementById('user-mood').value,
         idManhole: document.getElementById('id-manhole').value,
         idCulture: document.getElementById('id-culture').value,
-        idShelter: document.getElementById('id-shelter').value
+        idShelter: document.getElementById('id-shelter').value,
+        // 新規追加
+        walkDuration: document.getElementById('walk-duration').value,
+        finalDest: document.getElementById('final-dest').value
     };
     localStorage.setItem('kureApp_settings', JSON.stringify(settings));
 }
@@ -59,16 +62,17 @@ function loadSettings() {
         if(settings.idManhole) document.getElementById('id-manhole').value = settings.idManhole;
         if(settings.idCulture) document.getElementById('id-culture').value = settings.idCulture;
         if(settings.idShelter) document.getElementById('id-shelter').value = settings.idShelter;
+        // 新規追加
+        if(settings.walkDuration) document.getElementById('walk-duration').value = settings.walkDuration;
+        if(settings.finalDest) document.getElementById('final-dest').value = settings.finalDest;
     }
 }
 
-// --- サイドバー開閉 ---
 function toggleSidebar() {
     const sidebar = document.getElementById('sidebar');
     sidebar.classList.toggle('closed');
 }
 
-// --- 時計更新 ---
 setInterval(() => {
     const now = new Date();
     const timeStr = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
@@ -236,6 +240,9 @@ function addSpotToMap(lat, lon, type, name, source, bgClass, iconClass="fa-map-p
 async function askAI() {
     const geminiKey = document.getElementById('gemini-key').value;
     const mood = document.getElementById('user-mood').value;
+    // ★新規取得: 時間とゴール
+    const duration = document.getElementById('walk-duration').value || 60;
+    const destination = document.getElementById('final-dest').value || "AIにお任せ(最適な場所)";
     
     if(!geminiKey) { alert("Gemini APIキーを入力してください"); return; }
     if(gatheredSpots.length === 0) { alert("周辺にスポットがありません"); return; }
@@ -247,12 +254,16 @@ async function askAI() {
     const spotsListJson = gatheredSpots.sort(() => 0.5 - Math.random()).slice(0, 40)
         .map(s => ({ name: s.name, type: s.type, lat: s.lat, lon: s.lon }));
 
+    // ★プロンプトに時間とゴールを反映
     const prompt = `
 あなたは呉市のフォトスポットガイドです。
 以下のデータから、最も写真映えする散歩ルートを1つ作成してください。
 
 【条件】
-- 現在地からスタートし、3〜5箇所のスポットを巡る現実的なルート。
+- 現在地からスタートすること。
+- 所要時間: 約${duration}分 (移動+撮影時間) で回れること。
+- ゴール地点: "${destination}" にすること。
+  (もしゴール地点が特定の施設名で、それが候補データにない場合は、AIの知識でその座標を推定して最後のステップに追加してください)
 - 天気(${weatherDescription}, 予報:${forecastText})と気分(${mood})を考慮すること。
 - 長文の説明は不要。
 
@@ -268,10 +279,11 @@ async function askAI() {
       "lon": 経度(数値),
       "photo_tip": "写真のヒント"
     },
+    // ... 中略 ...
     {
-      "name": "スポット名2",
+      "name": "ゴール地点の名称",
       "lat": 緯度, "lon": 経度,
-      "photo_tip": "写真のヒント"
+      "photo_tip": "旅の締めくくりに"
     }
   ]
 }
@@ -308,7 +320,7 @@ ${JSON.stringify(spotsListJson)}
     }
 }
 
-// --- ★OSRMを使って道なりのルートを引く (グラデーション対応) ---
+// --- OSRMを使って道なりのルートを引く (グラデーション対応) ---
 async function drawSmartRoute(routePoints) {
     if(!routePoints || routePoints.length === 0) return;
 
@@ -328,23 +340,15 @@ async function drawSmartRoute(routePoints) {
             const geometry = data.routes[0].geometry;
             const coordinates = geometry.coordinates;
             
-            // グラデーション用のデータを作成 [lat, lon, value(0.0~1.0)]
             const hotlineData = coordinates.map((c, index) => [
-                c[1], // lat
-                c[0], // lon
-                index / (coordinates.length - 1) // 進捗値 (0.0 = スタート, 1.0 = ゴール)
+                c[1], c[0], index / (coordinates.length - 1)
             ]);
 
-            // ★L.hotline を使ってグラデーション線を描画
             const hotline = L.hotline(hotlineData, {
                 weight: 6,
                 outlineWidth: 1,
                 outlineColor: 'white',
-                palette: { 
-                    0.0: '#0000ff', // スタート: 青
-                    0.5: '#ff00ff', // 中間: 紫
-                    1.0: '#ff0000'  // ゴール: 赤
-                }
+                palette: { 0.0: '#0000ff', 0.5: '#ff00ff', 1.0: '#ff0000' }
             }).addTo(routeLayer);
 
             map.fitBounds(hotline.getBounds(), { padding: [50, 50], maxZoom: 17 });
@@ -358,20 +362,18 @@ async function drawSmartRoute(routePoints) {
     } catch (e) {
         console.error("OSRM Error:", e);
         log("⚠️ 道案内データの取得に失敗しました");
-        // フォールバック: 直線を引く
         const fallbackLine = waypoints.map(p => [p[1], p[0]]);
         L.polyline(fallbackLine, { color: 'red', dashArray: '5,5' }).addTo(routeLayer);
         addRouteMarkers(routePoints);
     }
 }
 
-// --- ルート番号マーカーを表示 ---
 function addRouteMarkers(routePoints) {
     routePoints.forEach((pt, index) => {
         const numIcon = L.divIcon({
             className: '',
             html: `<div style="
-                background: #ff0000; color: white; border-radius: 50%; /* ゴールに近い色 */
+                background: #ff0000; color: white; border-radius: 50%;
                 width: 24px; height: 24px; text-align: center; line-height: 24px;
                 font-weight: bold; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">
                 ${index + 1}

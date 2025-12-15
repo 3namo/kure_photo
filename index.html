@@ -54,7 +54,16 @@
 
         <div class="control-group">
             <label>3. 今の気分・テーマ</label>
-            <input type="text" id="user-mood" placeholder="例: 静かで落ち着ける場所、工場萌え、サイバーパンクな写真旅">
+            <input type="text" id="user-mood" placeholder="例: レトロ、工場夜景、猫探し">
+        </div>
+
+        <div class="control-group">
+            <label>4. 所要時間 (分)</label>
+            <input type="number" id="walk-duration" placeholder="例: 60" value="60">
+            
+            <label style="margin-top:10px;">5. ゴール地点 (任意)</label>
+            <div class="hint">※空欄ならAIが良い場所を提案します</div>
+            <input type="text" id="final-dest" placeholder="例: 呉駅、大和ミュージアム、入船山記念館">
         </div>
 
         <div id="log-area">システムログ: 待機中...</div>
