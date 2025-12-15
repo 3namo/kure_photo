@@ -4,8 +4,8 @@
 const WEATHER_API_KEY = "f5ced26dbed1c3f5d9ca115851dd4cce";
 const KURE_API_KEY    = "a2620ef7-164e-467c-85c6-a51ca43f1fe5";
 
-// ★モデル名: あなたの環境で動作するモデル名を設定してください
-const GEMINI_MODEL_NAME = "gemini-2.5-flash"; 
+// ★モデル名: ご指定通り gemini-2.5-flash に統一します
+const GEMINI_MODEL_NAME = "gemini-2.5-flash";
 // ==========================================
 
 // グローバル変数
@@ -19,7 +19,7 @@ let forecastText = "";
 
 // --- 1. 初期化処理 ---
 window.onload = function() {
-    loadSettings(); // 設定の復元
+    loadSettings();
 
     map = L.map('map').setView([34.248, 132.565], 14);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -32,7 +32,6 @@ window.onload = function() {
         await startExploration(e.latlng.lat, e.latlng.lng);
     });
 
-    // 入力監視 (自動保存)
     const inputs = document.querySelectorAll('input');
     inputs.forEach(input => {
         input.addEventListener('input', saveSettings);
@@ -299,7 +298,6 @@ ${JSON.stringify(spotsListJson)}
         const routeData = JSON.parse(text);
         log("🗺️ ルートデータを受信。ナビゲーション取得中...");
         
-        // ★修正ポイント: OSRMで道なりのルートを取得・描画
         await drawSmartRoute(routeData.route);
         renderRouteSidebar(routeData);
 
@@ -310,21 +308,16 @@ ${JSON.stringify(spotsListJson)}
     }
 }
 
-// --- ★新規追加: OSRMを使って道なりのルートを引く ---
+// --- ★OSRMを使って道なりのルートを引く (グラデーション対応) ---
 async function drawSmartRoute(routePoints) {
     if(!routePoints || routePoints.length === 0) return;
 
-    // 経由点の座標文字列を作成 (lon,lat;lon,lat...)
-    // OSRMは [経度, 緯度] の順序であることに注意！
     const waypoints = [
-        [currentLon, currentLat], // スタート地点
+        [currentLon, currentLat],
         ...routePoints.map(p => [p.lon, p.lat])
     ];
 
-    // 座標を文字列に変換
     const coordsString = waypoints.map(pt => pt.join(',')).join(';');
-
-    // OSRM API (徒歩モード) を呼び出し
     const osrmUrl = `https://router.project-osrm.org/route/v1/walking/${coordsString}?overview=full&geometries=geojson`;
 
     try {
@@ -333,48 +326,58 @@ async function drawSmartRoute(routePoints) {
 
         if (data.routes && data.routes.length > 0) {
             const geometry = data.routes[0].geometry;
+            const coordinates = geometry.coordinates;
             
-            // GeoJSONの座標 ([lon, lat]) を Leaflet用 ([lat, lon]) に変換
-            const latlngs = geometry.coordinates.map(c => [c[1], c[0]]);
+            // グラデーション用のデータを作成 [lat, lon, value(0.0~1.0)]
+            const hotlineData = coordinates.map((c, index) => [
+                c[1], // lat
+                c[0], // lon
+                index / (coordinates.length - 1) // 進捗値 (0.0 = スタート, 1.0 = ゴール)
+            ]);
 
-            // 道なりの線を引く
-            const polyline = L.polyline(latlngs, {
-                color: '#ff4500',
+            // ★L.hotline を使ってグラデーション線を描画
+            const hotline = L.hotline(hotlineData, {
                 weight: 6,
-                opacity: 0.8,
-                dashArray: '10, 10', 
-                className: 'animated-route'
+                outlineWidth: 1,
+                outlineColor: 'white',
+                palette: { 
+                    0.0: '#0000ff', // スタート: 青
+                    0.5: '#ff00ff', // 中間: 紫
+                    1.0: '#ff0000'  // ゴール: 赤
+                }
             }).addTo(routeLayer);
 
-            map.fitBounds(polyline.getBounds(), { padding: [50, 50], maxZoom: 17 });
-            
-            // ★重なり対策: ルート上に番号付きマーカーを追加
+            map.fitBounds(hotline.getBounds(), { padding: [50, 50], maxZoom: 17 });
             addRouteMarkers(routePoints);
         } else {
-            // ルートが見つからない場合は直線を引く (フォールバック)
             console.warn("OSRMルート取得失敗。直線を引きます。");
             const fallbackLine = waypoints.map(p => [p[1], p[0]]);
             L.polyline(fallbackLine, { color: 'red', dashArray: '5,5' }).addTo(routeLayer);
+            addRouteMarkers(routePoints);
         }
     } catch (e) {
         console.error("OSRM Error:", e);
         log("⚠️ 道案内データの取得に失敗しました");
+        // フォールバック: 直線を引く
+        const fallbackLine = waypoints.map(p => [p[1], p[0]]);
+        L.polyline(fallbackLine, { color: 'red', dashArray: '5,5' }).addTo(routeLayer);
+        addRouteMarkers(routePoints);
     }
 }
 
-// --- ★新規追加: ルート番号マーカーを表示 ---
+// --- ルート番号マーカーを表示 ---
 function addRouteMarkers(routePoints) {
     routePoints.forEach((pt, index) => {
         const numIcon = L.divIcon({
             className: '',
             html: `<div style="
-                background: #ff4500; color: white; border-radius: 50%; 
+                background: #ff0000; color: white; border-radius: 50%; /* ゴールに近い色 */
                 width: 24px; height: 24px; text-align: center; line-height: 24px;
                 font-weight: bold; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">
                 ${index + 1}
             </div>`,
             iconSize: [28, 28],
-            iconAnchor: [14, 28] // ピンの足元ではなく中心〜下に合わせる
+            iconAnchor: [14, 28]
         });
 
         L.marker([pt.lat, pt.lon], { icon: numIcon, zIndexOffset: 1000 })
@@ -389,11 +392,11 @@ function renderRouteSidebar(data) {
     data.route.forEach((step, index) => {
         html += `
             <div class="route-step">
-                <div class="step-name"><span style="color:#ff4500;">Step ${index + 1}:</span> ${step.name}</div>
+                <div class="step-name"><span style="color:#ff0000;">Step ${index + 1}:</span> ${step.name}</div>
                 <div class="step-photo"><i class="fa-solid fa-camera"></i> ${step.photo_tip}</div>
             </div>
         `;
     });
-    html += `<small style="color:#666;">※赤い点線が実際の道順です。</small>`;
+    html += `<small style="color:#666;">※青(スタート)から赤(ゴール)へ向かって進んでください。</small>`;
     responseArea.innerHTML = html;
 }

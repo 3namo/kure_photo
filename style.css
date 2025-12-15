@@ -78,7 +78,7 @@ button#btn-search:disabled { background: #ccc; cursor: not-allowed; }
 .route-theme { font-size: 1.2em; font-weight: bold; color: #007bff; margin-bottom: 15px; text-align: center; border-bottom: 2px solid #007bff; padding-bottom:5px; }
 .route-step {
     padding: 10px; margin-bottom: 10px; background: #f9f9f9;
-    border-left: 4px solid #ff4500; border-radius: 4px;
+    border-left: 4px solid #ff0000; border-radius: 4px;
 }
 .step-name { font-weight: bold; font-size: 1.1em; margin-bottom: 5px; color: #333; }
 .step-photo { font-size: 0.9em; color: #555; }
@@ -93,15 +93,6 @@ button#btn-search:disabled { background: #ccc; cursor: not-allowed; }
 }
 /* カラー定義 */
 .bg-steps{background:#00BFFF}.bg-path{background:#87CEEB}.bg-shrine{background:#FF4500}.bg-temple{background:#800080}.bg-view{background:#32CD32}.bg-infra{background:#708090}.bg-retro{background:#8B4513}.bg-lamp{background:#FFD700;color:#333;border-color:#333}.bg-vending{background:#0000FF}.bg-manhole{background:#A9A9A9}.bg-kure{background:#FF00FF;border:2px solid yellow}
-
-/* --- ルート線のアニメーション --- */
-@keyframes dash-animation {
-    0% { stroke-dashoffset: 0; }
-    100% { stroke-dashoffset: -20; }
-}
-.animated-route {
-    animation: dash-animation 1s linear infinite;
-}
 
 /* スマホ対応 */
 @media (max-width: 600px) {
