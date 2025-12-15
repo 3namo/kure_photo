@@ -1,10 +1,10 @@
 /* --- レイアウト基本設定 --- */
 body { margin: 0; padding: 0; font-family: "Helvetica Neue", Arial, sans-serif; display: flex; height: 100vh; overflow: hidden; }
 
-/* --- サイドバー --- */
+/* --- サイドバー (幅を500pxに拡張) --- */
 #sidebar {
-    width: 420px;
-    background: #f8f9fa; padding: 20px;
+    width: 500px; /* ★ここを広げました */
+    background: #f8f9fa; padding: 25px; /* パディングも少し増やしてゆったりと */
     box-shadow: 2px 0 5px rgba(0,0,0,0.1);
     overflow-y: auto; z-index: 2000; display: flex; flex-direction: column;
     position: relative; flex-shrink: 0;
@@ -12,7 +12,7 @@ body { margin: 0; padding: 0; font-family: "Helvetica Neue", Arial, sans-serif; 
 }
 
 #sidebar.closed { position: absolute; transform: translateX(-100%); height: 100%; }
-.sidebar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.sidebar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
 
 /* 開閉ボタン */
 #sidebar-toggle {
@@ -28,7 +28,8 @@ body { margin: 0; padding: 0; font-family: "Helvetica Neue", Arial, sans-serif; 
 /* --- データセット開閉ヘッダー --- */
 .dataset-header {
     display: flex; justify-content: space-between; align-items: center;
-    cursor: pointer; padding: 5px; background: #eee; border-radius: 4px;
+    cursor: pointer; padding: 8px 10px; background: #eee; border-radius: 4px;
+    font-weight: bold; color: #555;
 }
 .dataset-header:hover { background: #e0e0e0; }
 
@@ -36,65 +37,64 @@ body { margin: 0; padding: 0; font-family: "Helvetica Neue", Arial, sans-serif; 
 #map { flex-grow: 1; height: 100%; cursor: crosshair; z-index: 1; }
 
 /* --- フォーム部品 --- */
-h2 { margin: 0; color: #333; font-size: 1.5rem; }
-.control-group { margin-bottom: 15px; border-bottom: 1px solid #ddd; padding-bottom: 15px; }
-label { display: block; font-weight: bold; margin-bottom: 5px; color: #555; font-size: 0.9em; }
-.hint { font-size: 0.8em; color: #888; margin-bottom: 5px; }
-input { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; margin-bottom: 5px; }
+h2 { margin: 0; color: #333; font-size: 1.6rem; }
+.control-group { margin-bottom: 20px; border-bottom: 1px solid #ddd; padding-bottom: 20px; }
+label { display: block; font-weight: bold; margin-bottom: 8px; color: #444; font-size: 1em; }
+.hint { font-size: 0.85em; color: #888; margin-bottom: 8px; }
+input { width: 100%; padding: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; margin-bottom: 5px; font-size: 1em; }
 
 button#btn-search {
-    width: 100%; padding: 12px; background: #007bff; color: white;
-    border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 1em; transition: 0.2s;
+    width: 100%; padding: 15px; background: #007bff; color: white;
+    border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 1.1em; transition: 0.2s;
+    box-shadow: 0 4px 6px rgba(0,123,255,0.2);
 }
-button#btn-search:hover { background: #0056b3; }
-button#btn-search:disabled { background: #ccc; cursor: not-allowed; }
+button#btn-search:hover { background: #0056b3; box-shadow: 0 2px 4px rgba(0,123,255,0.2); }
+button#btn-search:disabled { background: #ccc; cursor: not-allowed; box-shadow: none; }
 
-#log-area { font-size: 0.8em; color: #666; margin-bottom: 10px; height: 60px; overflow-y: scroll; background: #eee; padding: 5px; border-radius: 4px;}
+#log-area { font-size: 0.85em; color: #666; margin-bottom: 15px; height: 80px; overflow-y: scroll; background: #eee; padding: 10px; border-radius: 4px;}
 
 /* --- 天気ウィジェット --- */
 #weather-widget {
-    background: #fff; border-radius: 8px; padding: 15px; margin-bottom: 20px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1); border-left: 5px solid #007bff;
+    background: #fff; border-radius: 8px; padding: 15px; margin-bottom: 25px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-left: 6px solid #007bff;
 }
 #current-status { border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 10px; }
-#clock { font-size: 1.8em; font-weight: bold; color: #333; font-family: monospace; text-align: center; letter-spacing: 2px; }
-.weather-row { display: flex; align-items: center; justify-content: center; gap: 10px; }
-#weather-icon { width: 50px; height: 50px; }
-#weather-temp { font-size: 1.5em; font-weight: bold; color: #007bff; }
-#weather-desc { font-size: 0.9em; color: #666; }
+#clock { font-size: 2em; font-weight: bold; color: #333; font-family: monospace; text-align: center; letter-spacing: 2px; }
+.weather-row { display: flex; align-items: center; justify-content: center; gap: 15px; }
+#weather-icon { width: 60px; height: 60px; }
+#weather-temp { font-size: 1.8em; font-weight: bold; color: #007bff; }
+#weather-desc { font-size: 1em; color: #666; }
 #forecast-container { display: flex; overflow-x: auto; gap: 10px; padding-bottom: 5px; }
-.forecast-item { min-width: 60px; text-align: center; background: #f8f9fa; padding: 5px; border-radius: 4px; font-size: 0.8em; }
+.forecast-item { min-width: 70px; text-align: center; background: #f8f9fa; padding: 8px; border-radius: 6px; font-size: 0.85em; }
 .forecast-time { font-weight: bold; color: #555; }
-.forecast-icon { width: 30px; height: 30px; display: block; margin: 0 auto; }
-.forecast-temp { color: #007bff; }
+.forecast-icon { width: 35px; height: 35px; display: block; margin: 0 auto; }
+.forecast-temp { color: #007bff; font-weight: bold; }
 
 /* --- AI回答エリア --- */
 #ai-response {
-    flex-grow: 1; padding: 15px; background: white; border: 1px solid #ddd;
-    border-radius: 4px; overflow-y: auto; font-size: 0.95em; line-height: 1.5;
+    flex-grow: 1; padding: 20px; background: white; border: 1px solid #ddd;
+    border-radius: 6px; overflow-y: auto; font-size: 1em; line-height: 1.6;
 }
 
 .route-theme { 
-    font-size: 1.2em; font-weight: bold; color: #333; margin-bottom: 5px; 
-    text-align: center; 
+    font-size: 1.4em; font-weight: bold; color: #333; margin-bottom: 15px; 
+    text-align: center; line-height: 1.4;
 }
 .route-meta {
-    text-align: center; margin-bottom: 15px; color: #666; font-size: 0.9em;
-    padding-bottom: 10px; border-bottom: 1px solid #eee;
+    text-align: center; margin-bottom: 20px; color: #555; font-size: 1em;
+    padding: 10px; background: #eef5ff; border-radius: 8px;
+    display: flex; justify-content: center; gap: 20px;
 }
-.route-meta span {
-    background: #eef5ff; color: #007bff; padding: 3px 8px; border-radius: 10px;
-    margin: 0 5px; font-weight: bold;
-}
+.route-meta span { font-weight: bold; color: #007bff; font-size: 1.2em; }
 
 .route-step {
-    padding: 10px; margin-bottom: 10px; background: #fff;
-    border-left: 4px solid #ff4500; border-radius: 4px;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    padding: 15px; margin-bottom: 15px; background: #fff;
+    border-left: 6px solid #ff4500; border-radius: 6px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05); border: 1px solid #eee;
 }
-.step-name { font-weight: bold; font-size: 1.05em; margin-bottom: 5px; color: #333; }
-.step-photo { font-size: 0.9em; color: #555; display: flex; align-items: flex-start; }
-.step-photo i { color: #007bff; margin-right: 5px; margin-top: 3px; }
+.step-name { font-weight: bold; font-size: 1.2em; margin-bottom: 8px; color: #333; }
+.step-photo { font-size: 0.95em; color: #666; display: flex; align-items: flex-start; }
+.step-photo i { color: #007bff; margin-right: 8px; margin-top: 4px; }
 
 /* --- アイコン --- */
 .custom-icon {
