@@ -1,4 +1,11 @@
-/* --- レイアウト基本設定 --- */
+/* =========================================
+   レイアウト基本設定
+   ========================================= */
+/* 全要素でサイズ計算を統一（レイアウト崩れ防止） */
+* {
+    box-sizing: border-box; 
+}
+
 body { 
     margin: 0; 
     padding: 0; 
@@ -8,17 +15,18 @@ body {
     overflow: hidden; /* 画面全体としてのスクロールは禁止 */
 }
 
-/* --- サイドバー（ここがスクロールします） --- */
+/* =========================================
+   サイドバー（ここがスクロールします）
+   ========================================= */
 #sidebar {
     width: 500px;
     background: #f8f9fa; 
-    padding: 25px;
+    padding: 20px; /* パディングを少し狭く調整 */
     box-shadow: 2px 0 5px rgba(0,0,0,0.1);
     
-    /* ★修正: スクロールバーを強制的に表示し、高さを画面に合わせる */
+    /* ★重要: 高さを画面に合わせ、中身が多い場合のみスクロール */
     height: 100vh; 
-    overflow-y: scroll; /* autoではなくscrollで常時表示 */
-    box-sizing: border-box; /* paddingを含めて高さを計算 */
+    overflow-y: auto; /* scrollではなくauto推奨（必要な時だけ出る） */
 
     /* Firefox用スクロールバー設定 */
     scrollbar-width: thin;
@@ -32,6 +40,25 @@ body {
     transition: transform 0.3s ease;
 }
 
+/* --- スクロールバーのデザイン強化 (Chrome, Safari, Edge) --- */
+#sidebar::-webkit-scrollbar {
+    width: 10px; /* 適度な太さ */
+    display: block; /* 強制表示 */
+}
+#sidebar::-webkit-scrollbar-track {
+    background: #f0f0f0; 
+    border-left: 1px solid #ddd; /* 境界線を追加して認識しやすく */
+}
+#sidebar::-webkit-scrollbar-thumb {
+    background-color: #bbb; /* つまみ部分を少し濃い色に */
+    border-radius: 5px;
+    border: 2px solid #f0f0f0; /* 余白を作る */
+}
+#sidebar::-webkit-scrollbar-thumb:hover {
+    background-color: #999; 
+}
+
+/* サイドバーを閉じた時のスタイル */
 #sidebar.closed { 
     position: absolute; 
     transform: translateX(-100%); 
@@ -45,24 +72,6 @@ body {
     margin-bottom: 15px; 
 }
 
-/* --- Chrome/Edge/Safari用スクロールバーのカスタマイズ --- */
-#sidebar::-webkit-scrollbar {
-    width: 12px; /* 少し太くして押しやすくする */
-}
-#sidebar::-webkit-scrollbar-track {
-    background: #f1f1f1; 
-    border-radius: 6px;
-}
-#sidebar::-webkit-scrollbar-thumb {
-    background: #c1c1c1; 
-    border-radius: 6px;
-    border: 2px solid #f1f1f1; /* 枠線を付けて丸みを強調 */
-}
-#sidebar::-webkit-scrollbar-thumb:hover {
-    background: #a8a8a8; /* ホバー時に濃くする */
-}
-
-
 /* --- 開閉ボタン --- */
 #sidebar-toggle {
     position: absolute; top: 10px; left: 10px; z-index: 1500;
@@ -74,7 +83,10 @@ body {
 
 .mobile-only { display: none; background: none; border: none; font-size: 1.5em; color: #555; cursor: pointer; }
 
-/* --- アコーディオンヘッダー (共通設定) --- */
+/* =========================================
+   フォーム部品
+   ========================================= */
+/* アコーディオンヘッダー (共通設定) */
 .accordion-header {
     display: flex; justify-content: space-between; align-items: center;
     cursor: pointer; padding: 8px 10px; background: #eee; border-radius: 4px;
@@ -82,18 +94,14 @@ body {
 }
 .accordion-header:hover { background: #e0e0e0; }
 
-/* --- 地図 --- */
-#map { flex-grow: 1; height: 100%; cursor: crosshair; z-index: 1; }
-
-/* --- フォーム部品 --- */
-h2 { margin: 0; color: #333; font-size: 1.6rem; }
-.control-group { margin-bottom: 20px; border-bottom: 1px solid #ddd; padding-bottom: 20px; }
-label { display: block; font-weight: bold; margin-bottom: 8px; color: #444; font-size: 1em; }
-.hint { font-size: 0.85em; color: #888; margin-bottom: 8px; }
-input { width: 100%; padding: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; margin-bottom: 5px; font-size: 1em; }
+h2 { margin: 0; color: #333; font-size: 1.4rem; }
+.control-group { margin-bottom: 15px; border-bottom: 1px solid #ddd; padding-bottom: 15px; }
+label { display: block; font-weight: bold; margin-bottom: 5px; color: #444; font-size: 0.95em; }
+.hint { font-size: 0.8em; color: #888; margin-bottom: 5px; }
+input { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; margin-bottom: 5px; font-size: 0.95em; }
 
 button#btn-search {
-    width: 100%; padding: 15px; background: #007bff; color: white;
+    width: 100%; padding: 12px; background: #007bff; color: white;
     border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 1.1em; transition: 0.2s;
     box-shadow: 0 4px 6px rgba(0,123,255,0.2);
 }
@@ -102,54 +110,68 @@ button#btn-search:disabled { background: #ccc; cursor: not-allowed; box-shadow: 
 
 #log-area { font-size: 0.85em; color: #666; margin-bottom: 15px; height: 80px; overflow-y: scroll; background: #eee; padding: 10px; border-radius: 4px;}
 
-/* --- 天気ウィジェット --- */
+/* =========================================
+   天気ウィジェット (コンパクト版)
+   ========================================= */
 #weather-widget {
-    background: #fff; border-radius: 8px; padding: 15px; margin-bottom: 25px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-left: 6px solid #007bff;
+    background: #fff; 
+    border-radius: 8px; 
+    padding: 10px 15px; /* 上下のパディングを縮小 */
+    margin-bottom: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08); 
+    border-left: 5px solid #007bff;
 }
-#current-status { border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 10px; }
-#clock { font-size: 2em; font-weight: bold; color: #333; font-family: monospace; text-align: center; letter-spacing: 2px; }
-.weather-row { display: flex; align-items: center; justify-content: center; gap: 15px; }
-#weather-icon { width: 60px; height: 60px; }
-#weather-temp { font-size: 1.8em; font-weight: bold; color: #007bff; }
-#weather-desc { font-size: 1em; color: #666; }
-#forecast-container { display: flex; overflow-x: auto; gap: 10px; padding-bottom: 5px; }
-.forecast-item { min-width: 70px; text-align: center; background: #f8f9fa; padding: 8px; border-radius: 6px; font-size: 0.85em; }
+#current-status { 
+    border-bottom: 1px solid #eee; 
+    padding-bottom: 5px; 
+    margin-bottom: 8px; 
+}
+#clock { 
+    font-size: 1.6em; /* 文字サイズ調整 */
+    font-weight: bold; 
+    color: #333; 
+    font-family: monospace; 
+    text-align: center; 
+    letter-spacing: 1px;
+    margin-top: 0;
+    margin-bottom: 5px;
+}
+.weather-row { 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    gap: 10px; 
+}
+#weather-icon { width: 45px; height: 45px; }
+#weather-temp { font-size: 1.5em; font-weight: bold; color: #007bff; }
+#weather-desc { font-size: 0.9em; color: #666; }
+
+#forecast-container { 
+    display: flex; 
+    overflow-x: auto; 
+    gap: 8px; 
+    padding-bottom: 5px; 
+    padding-top: 5px;
+}
+.forecast-item { 
+    min-width: 60px; 
+    text-align: center; 
+    background: #f8f9fa; 
+    padding: 5px; 
+    border-radius: 6px; 
+    font-size: 0.75em;
+}
 .forecast-time { font-weight: bold; color: #555; }
-.forecast-icon { width: 35px; height: 35px; display: block; margin: 0 auto; }
+.forecast-icon { width: 25px; height: 25px; display: block; margin: 0 auto; }
 .forecast-temp { color: #007bff; font-weight: bold; }
+/* 予報欄のスクロールバー微調整 */
+#forecast-container::-webkit-scrollbar { height: 6px; }
+#forecast-container::-webkit-scrollbar-thumb { background: #ddd; border-radius: 3px; }
 
-/* --- AI結果エリアのスタイル --- */
-.route-theme { 
-    font-size: 1.4em; font-weight: bold; color: #333; margin-bottom: 15px; 
-    text-align: center; line-height: 1.4;
-}
-.route-meta {
-    text-align: center; margin-bottom: 20px; color: #555; font-size: 1em;
-    padding: 10px; background: #eef5ff; border-radius: 8px;
-    display: flex; justify-content: center; gap: 20px;
-}
-.route-meta span { font-weight: bold; color: #007bff; font-size: 1.2em; }
-
-.route-step {
-    padding: 15px; margin-bottom: 15px; background: #fff;
-    border-left: 6px solid #ff4500; border-radius: 6px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.05); border: 1px solid #eee;
-}
-.step-name { font-weight: bold; font-size: 1.2em; margin-bottom: 8px; color: #333; }
-.step-photo { font-size: 0.95em; color: #666; display: flex; align-items: flex-start; }
-.step-photo i { color: #007bff; margin-right: 8px; margin-top: 4px; }
-
-/* マーカーアイコン */
-.custom-icon {
-    display: flex; justify-content: center; align-items: center;
-    border-radius: 50%; color: white;
-    box-shadow: 0 3px 5px rgba(0,0,0,0.4);
-    border: 2px solid white; font-size: 14px;
-}
-.bg-steps{background:#00BFFF}.bg-path{background:#87CEEB}.bg-shrine{background:#FF4500}.bg-temple{background:#800080}.bg-view{background:#32CD32}.bg-infra{background:#708090}.bg-retro{background:#8B4513}.bg-lamp{background:#FFD700;color:#333;border-color:#333}.bg-vending{background:#0000FF}.bg-manhole{background:#A9A9A9}.bg-kure{background:#FF00FF;border:2px solid yellow}
-
-/* アコーディオン(details/summary)用のスタイル */
+/* =========================================
+   AI結果エリア & アコーディオン
+   ========================================= */
+/* アコーディオン全体 */
 .ai-accordion {
     margin-top: 15px;
     border: 1px solid #ddd;
@@ -159,8 +181,9 @@ button#btn-search:disabled { background: #ccc; cursor: not-allowed; box-shadow: 
     transition: all 0.3s;
 }
 
+/* クリック部分 (Summary) */
 .ai-accordion summary {
-    padding: 12px 15px;
+    padding: 10px 12px;
     background-color: #f0f8ff; /* 薄い青 */
     cursor: pointer;
     font-weight: bold;
@@ -170,6 +193,7 @@ button#btn-search:disabled { background: #ccc; cursor: not-allowed; box-shadow: 
     display: flex;
     justify-content: space-between;
     align-items: center;
+    font-size: 0.95em;
 }
 /* Chrome/Safari用マーカー削除 */
 .ai-accordion summary::-webkit-details-marker { display: none; }
@@ -191,16 +215,65 @@ button#btn-search:disabled { background: #ccc; cursor: not-allowed; box-shadow: 
     transform: rotate(180deg);
 }
 
+/* 結果表示エリア本体 */
 #ai-response {
     flex-grow: 1; 
-    padding: 20px; 
-    padding-bottom: 60px; /* ★修正: 一番下までスクロールしたときに余白を作る */
+    padding: 15px; 
+    padding-bottom: 80px; /* 一番下に余白を作る */
     background: white; 
     max-height: 600px; 
     overflow-y: auto;
     font-size: 1em; line-height: 1.6;
 }
 
+.route-theme { 
+    font-size: 1.3em; font-weight: bold; color: #333; margin-bottom: 12px; 
+    text-align: center; line-height: 1.4;
+}
+.route-meta {
+    text-align: center; margin-bottom: 15px; color: #555; font-size: 0.95em;
+    padding: 8px; background: #eef5ff; border-radius: 8px;
+    display: flex; justify-content: center; gap: 15px;
+}
+.route-meta span { font-weight: bold; color: #007bff; font-size: 1.1em; }
+
+.route-step {
+    padding: 12px; margin-bottom: 12px; background: #fff;
+    border-left: 5px solid #ff4500; border-radius: 6px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05); border: 1px solid #eee;
+}
+.step-name { font-weight: bold; font-size: 1.1em; margin-bottom: 5px; color: #333; }
+.step-photo { font-size: 0.9em; color: #666; display: flex; align-items: flex-start; }
+.step-photo i { color: #007bff; margin-right: 8px; margin-top: 4px; }
+
+/* =========================================
+   地図用スタイル
+   ========================================= */
+#map { flex-grow: 1; height: 100%; cursor: crosshair; z-index: 1; }
+
+.custom-icon {
+    display: flex; justify-content: center; align-items: center;
+    border-radius: 50%; color: white;
+    box-shadow: 0 3px 5px rgba(0,0,0,0.4);
+    border: 2px solid white; font-size: 14px;
+}
+
+/* ピンの色設定（展開して記述） */
+.bg-steps   { background: #00BFFF; }
+.bg-path    { background: #87CEEB; }
+.bg-shrine  { background: #FF4500; }
+.bg-temple  { background: #800080; }
+.bg-view    { background: #32CD32; }
+.bg-infra   { background: #708090; }
+.bg-retro   { background: #8B4513; }
+.bg-lamp    { background: #FFD700; color: #333; border-color: #333; }
+.bg-vending { background: #0000FF; }
+.bg-manhole { background: #A9A9A9; }
+.bg-kure    { background: #FF00FF; border: 2px solid yellow; }
+
+/* =========================================
+   レスポンシブ設定
+   ========================================= */
 @media (max-width: 600px) {
     #sidebar { width: 100%; position: absolute; height: 100%; }
     .mobile-only { display: block; }
