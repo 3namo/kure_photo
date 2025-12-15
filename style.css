@@ -1,27 +1,19 @@
 /* --- レイアウト基本設定 --- */
 body { margin: 0; padding: 0; font-family: "Helvetica Neue", Arial, sans-serif; display: flex; height: 100vh; overflow: hidden; }
 
-/* --- サイドバー --- */
+/* --- サイドバー (幅を広げました) --- */
 #sidebar {
-    width: 380px; background: #f8f9fa; padding: 20px;
+    width: 460px; /* ★ここを広げました (元380px) */
+    background: #f8f9fa; padding: 20px;
     box-shadow: 2px 0 5px rgba(0,0,0,0.1);
     overflow-y: auto; z-index: 2000; display: flex; flex-direction: column;
     position: relative; flex-shrink: 0;
-    transition: transform 0.3s ease; /* 開閉アニメーション */
+    transition: transform 0.3s ease;
 }
 
-/* サイドバーが閉じている時のクラス */
-#sidebar.closed {
-    position: absolute;
-    transform: translateX(-100%);
-    height: 100%;
-}
+#sidebar.closed { position: absolute; transform: translateX(-100%); height: 100%; }
+.sidebar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
 
-.sidebar-header {
-    display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;
-}
-
-/* 開閉ボタン */
 #sidebar-toggle {
     position: absolute; top: 10px; left: 10px; z-index: 1500;
     background: white; border: 2px solid #ccc; border-radius: 4px;
@@ -42,7 +34,6 @@ label { display: block; font-weight: bold; margin-bottom: 5px; color: #555; font
 .hint { font-size: 0.8em; color: #888; margin-bottom: 5px; }
 input { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; margin-bottom: 5px; }
 
-/* ボタン */
 button#btn-search {
     width: 100%; padding: 12px; background: #007bff; color: white;
     border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 1em; transition: 0.2s;
@@ -50,7 +41,6 @@ button#btn-search {
 button#btn-search:hover { background: #0056b3; }
 button#btn-search:disabled { background: #ccc; cursor: not-allowed; }
 
-/* ログ表示エリア */
 #log-area { font-size: 0.8em; color: #666; margin-bottom: 10px; height: 60px; overflow-y: scroll; background: #eee; padding: 5px; border-radius: 4px;}
 
 /* --- 天気ウィジェット --- */
@@ -72,29 +62,46 @@ button#btn-search:disabled { background: #ccc; cursor: not-allowed; }
 
 /* --- AI回答エリア --- */
 #ai-response {
-    flex-grow: 1; padding: 10px; background: white; border: 1px solid #ddd;
-    border-radius: 4px; overflow-y: auto; font-size: 0.95em; line-height: 1.4;
+    flex-grow: 1; padding: 15px; background: white; border: 1px solid #ddd;
+    border-radius: 4px; overflow-y: auto; font-size: 0.95em; line-height: 1.5;
 }
-.route-theme { font-size: 1.2em; font-weight: bold; color: #007bff; margin-bottom: 15px; text-align: center; border-bottom: 2px solid #007bff; padding-bottom:5px; }
-.route-step {
-    padding: 10px; margin-bottom: 10px; background: #f9f9f9;
-    border-left: 4px solid #ff0000; border-radius: 4px;
-}
-.step-name { font-weight: bold; font-size: 1.1em; margin-bottom: 5px; color: #333; }
-.step-photo { font-size: 0.9em; color: #555; }
-.step-photo i { color: #007bff; margin-right: 5px; }
 
-/* --- アイコン装飾 --- */
+/* ★距離・時間のサマリー表示 */
+.route-summary {
+    display: flex; justify-content: space-around; align-items: center;
+    background: #eef5ff; padding: 15px 10px; border-radius: 8px;
+    margin-bottom: 20px; border: 1px solid #cce5ff;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+.summary-item {
+    font-size: 1.2em; font-weight: bold; color: #0056b3;
+    display: flex; flex-direction: column; align-items: center;
+}
+.summary-item i { font-size: 1.4em; margin-bottom: 5px; color: #007bff; }
+.summary-label { font-size: 0.7em; color: #666; font-weight: normal; }
+
+.route-theme { 
+    font-size: 1.3em; font-weight: bold; color: #333; margin-bottom: 20px; 
+    text-align: center; padding-bottom: 10px; border-bottom: 2px solid #eee; 
+}
+.route-step {
+    padding: 15px; margin-bottom: 15px; background: #fff;
+    border-left: 5px solid #ff4500; border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+.step-name { font-weight: bold; font-size: 1.1em; margin-bottom: 8px; color: #333; }
+.step-photo { font-size: 0.95em; color: #555; display: flex; align-items: flex-start; }
+.step-photo i { color: #007bff; margin-right: 8px; margin-top: 3px; }
+
+/* --- アイコン --- */
 .custom-icon {
     display: flex; justify-content: center; align-items: center;
     border-radius: 50%; color: white;
     box-shadow: 0 3px 5px rgba(0,0,0,0.4);
     border: 2px solid white; font-size: 14px;
 }
-/* カラー定義 */
 .bg-steps{background:#00BFFF}.bg-path{background:#87CEEB}.bg-shrine{background:#FF4500}.bg-temple{background:#800080}.bg-view{background:#32CD32}.bg-infra{background:#708090}.bg-retro{background:#8B4513}.bg-lamp{background:#FFD700;color:#333;border-color:#333}.bg-vending{background:#0000FF}.bg-manhole{background:#A9A9A9}.bg-kure{background:#FF00FF;border:2px solid yellow}
 
-/* スマホ対応 */
 @media (max-width: 600px) {
     #sidebar { width: 100%; position: absolute; height: 100%; }
     .mobile-only { display: block; }

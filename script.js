@@ -38,7 +38,7 @@ window.onload = function() {
     });
 };
 
-// --- 設定の自動保存と復元 (項目追加) ---
+// --- 設定の自動保存と復元 ---
 function saveSettings() {
     const settings = {
         geminiKey: document.getElementById('gemini-key').value,
@@ -46,7 +46,6 @@ function saveSettings() {
         idManhole: document.getElementById('id-manhole').value,
         idCulture: document.getElementById('id-culture').value,
         idShelter: document.getElementById('id-shelter').value,
-        // 新規追加
         walkDuration: document.getElementById('walk-duration').value,
         finalDest: document.getElementById('final-dest').value
     };
@@ -62,7 +61,6 @@ function loadSettings() {
         if(settings.idManhole) document.getElementById('id-manhole').value = settings.idManhole;
         if(settings.idCulture) document.getElementById('id-culture').value = settings.idCulture;
         if(settings.idShelter) document.getElementById('id-shelter').value = settings.idShelter;
-        // 新規追加
         if(settings.walkDuration) document.getElementById('walk-duration').value = settings.walkDuration;
         if(settings.finalDest) document.getElementById('final-dest').value = settings.finalDest;
     }
@@ -240,7 +238,6 @@ function addSpotToMap(lat, lon, type, name, source, bgClass, iconClass="fa-map-p
 async function askAI() {
     const geminiKey = document.getElementById('gemini-key').value;
     const mood = document.getElementById('user-mood').value;
-    // ★新規取得: 時間とゴール
     const duration = document.getElementById('walk-duration').value || 60;
     const destination = document.getElementById('final-dest').value || "AIにお任せ(最適な場所)";
     
@@ -254,7 +251,6 @@ async function askAI() {
     const spotsListJson = gatheredSpots.sort(() => 0.5 - Math.random()).slice(0, 40)
         .map(s => ({ name: s.name, type: s.type, lat: s.lat, lon: s.lon }));
 
-    // ★プロンプトに時間とゴールを反映
     const prompt = `
 あなたは呉市のフォトスポットガイドです。
 以下のデータから、最も写真映えする散歩ルートを1つ作成してください。
@@ -263,7 +259,6 @@ async function askAI() {
 - 現在地からスタートすること。
 - 所要時間: 約${duration}分 (移動+撮影時間) で回れること。
 - ゴール地点: "${destination}" にすること。
-  (もしゴール地点が特定の施設名で、それが候補データにない場合は、AIの知識でその座標を推定して最後のステップに追加してください)
 - 天気(${weatherDescription}, 予報:${forecastText})と気分(${mood})を考慮すること。
 - 長文の説明は不要。
 
@@ -279,11 +274,10 @@ async function askAI() {
       "lon": 経度(数値),
       "photo_tip": "写真のヒント"
     },
-    // ... 中略 ...
     {
-      "name": "ゴール地点の名称",
+      "name": "スポット名2",
       "lat": 緯度, "lon": 経度,
-      "photo_tip": "旅の締めくくりに"
+      "photo_tip": "写真のヒント"
     }
   ]
 }
@@ -308,10 +302,13 @@ ${JSON.stringify(spotsListJson)}
         text = text.replace(/^```json\s*/, "").replace(/\s*```$/, "");
 
         const routeData = JSON.parse(text);
+        
+        // ★後でOSRMの距離データと合体させるために保存
+        window.lastRouteData = routeData;
+
         log("🗺️ ルートデータを受信。ナビゲーション取得中...");
         
         await drawSmartRoute(routeData.route);
-        renderRouteSidebar(routeData);
 
     } catch(e) {
         console.error(e);
@@ -320,7 +317,7 @@ ${JSON.stringify(spotsListJson)}
     }
 }
 
-// --- OSRMを使って道なりのルートを引く (グラデーション対応) ---
+// --- ★OSRMを使って道なりのルートを引く (グラデーション+矢印+距離時間) ---
 async function drawSmartRoute(routePoints) {
     if(!routePoints || routePoints.length === 0) return;
 
@@ -336,14 +333,24 @@ async function drawSmartRoute(routePoints) {
         const res = await fetch(osrmUrl);
         const data = await res.json();
 
+        // 距離と時間の初期値
+        let distMeters = 0;
+        let durSeconds = 0;
+
         if (data.routes && data.routes.length > 0) {
-            const geometry = data.routes[0].geometry;
-            const coordinates = geometry.coordinates;
+            const route = data.routes[0];
+            const coordinates = route.geometry.coordinates;
             
+            // ★OSRMから距離と時間を取得
+            distMeters = route.distance; 
+            durSeconds = route.duration;
+
+            // グラデーション用のデータ
             const hotlineData = coordinates.map((c, index) => [
                 c[1], c[0], index / (coordinates.length - 1)
             ]);
 
+            // 1. グラデーション線
             const hotline = L.hotline(hotlineData, {
                 weight: 6,
                 outlineWidth: 1,
@@ -351,13 +358,37 @@ async function drawSmartRoute(routePoints) {
                 palette: { 0.0: '#0000ff', 0.5: '#ff00ff', 1.0: '#ff0000' }
             }).addTo(routeLayer);
 
+            // 2. 矢印を描画 (透明な線の上に矢印を配置)
+            const arrowLine = L.polyline(coordinates.map(c => [c[1], c[0]]), {
+                color: 'transparent', 
+                weight: 0
+            }).addTo(routeLayer);
+
+            arrowLine.arrowheads({
+                size: '15px',
+                frequency: '80px',
+                fill: true,
+                color: '#ff4500',
+                offsets: { end: "10px" }
+            });
+
             map.fitBounds(hotline.getBounds(), { padding: [50, 50], maxZoom: 17 });
             addRouteMarkers(routePoints);
+            
+            // ★距離・時間情報を渡してサイドバーを表示
+            renderRouteSidebar({ 
+                ...window.lastRouteData, 
+                distance: distMeters, 
+                duration: durSeconds 
+            });
+
         } else {
             console.warn("OSRMルート取得失敗。直線を引きます。");
             const fallbackLine = waypoints.map(p => [p[1], p[0]]);
             L.polyline(fallbackLine, { color: 'red', dashArray: '5,5' }).addTo(routeLayer);
             addRouteMarkers(routePoints);
+            // フォールバック表示（距離なし）
+            renderRouteSidebar({ ...window.lastRouteData, distance: 0, duration: 0 });
         }
     } catch (e) {
         console.error("OSRM Error:", e);
@@ -388,17 +419,39 @@ function addRouteMarkers(routePoints) {
     });
 }
 
+// --- ★距離・時間を表示するように更新 ---
 function renderRouteSidebar(data) {
     const responseArea = document.getElementById('ai-response');
-    let html = `<div class="route-theme">“ ${data.theme} ”</div>`;
+    
+    // 距離と時間のフォーマット
+    const distStr = (data.distance !== undefined) ? (data.distance / 1000).toFixed(1) + " km" : "計測中...";
+    const timeStr = (data.duration !== undefined) ? Math.round(data.duration / 60) + " 分" : "計測中...";
+
+    let html = `
+        <div class="route-summary">
+            <div class="summary-item">
+                <i class="fa-solid fa-person-walking"></i>
+                <span>${distStr}</span>
+                <span class="summary-label">総距離</span>
+            </div>
+            <div class="summary-item">
+                <i class="fa-solid fa-clock"></i>
+                <span>${timeStr}</span>
+                <span class="summary-label">移動時間</span>
+            </div>
+        </div>
+        <div class="route-theme">“ ${data.theme} ”</div>
+    `;
+    
     data.route.forEach((step, index) => {
         html += `
             <div class="route-step">
-                <div class="step-name"><span style="color:#ff0000;">Step ${index + 1}:</span> ${step.name}</div>
+                <div class="step-name"><span style="color:#ff4500;">Step ${index + 1}:</span> ${step.name}</div>
                 <div class="step-photo"><i class="fa-solid fa-camera"></i> ${step.photo_tip}</div>
             </div>
         `;
     });
-    html += `<small style="color:#666;">※青(スタート)から赤(ゴール)へ向かって進んでください。</small>`;
+    
+    html += `<small style="color:#666;">※青(スタート)から赤(ゴール)へ。<br>矢印の方向に進んでください。</small>`;
     responseArea.innerHTML = html;
 }
