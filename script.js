@@ -286,14 +286,19 @@ async function fetchOverpass(lat, lon) {
                     // ビューポイント・史跡・滝・河川・海岸
                     node["tourism"="viewpoint"](around:1600,${lat},${lon});
                     node["historic"](around:1600,${lat},${lon});
-                    node["waterway"~"waterfall"](around:1600,${lat},${lon});
-                    relation["waterway"="river"](around:1600,${lat},${lon});
+                    node["waterway"~"waterfall|stream|river|canal"](around:1600,${lat},${lon});
+                    way["waterway"~"river|stream|canal|riverbank"](around:1600,${lat},${lon});
+                    relation["waterway"~"river|stream|canal"](around:1600,${lat},${lon});
                     way["natural"="coastline"](around:1600,${lat},${lon});
 
                     // 階段・小道・自販機などのインフラ
                     way["highway"="steps"](around:1000,${lat},${lon});
                     way["highway"="path"](around:1000,${lat},${lon});
                     node["amenity"="vending_machine"](around:1000,${lat},${lon});
+
+                    // 小規模な水域やnatural=waterも取得
+                    node["natural"="water"](around:1600,${lat},${lon});
+                    way["natural"="water"](around:1600,${lat},${lon});
 
                     // その他、表示したいタグがあれば追加
                 );
@@ -354,7 +359,7 @@ async function fetchOverpass(lat, lon) {
                 type = "絶景"; bg = "bg-view"; icon = "fa-camera";
             } else if (tags.historic) {
                 type = "史跡"; bg = "bg-retro"; icon = "fa-landmark";
-            } else if (tags.waterway || tags.natural === "coastline") {
+            } else if (tags.waterway || tags.natural === "coastline" || tags.natural === "water") {
                 type = "水辺・川・海"; bg = "bg-water"; icon = "fa-water";
             } else if (tags.highway === "steps") {
                 type = "階段"; bg = "bg-steps"; icon = "fa-person-hiking";
@@ -364,9 +369,20 @@ async function fetchOverpass(lat, lon) {
                 type = "自販機"; bg = "bg-vending"; icon = "fa-bottle-water";
             }
 
-            // 名前がないものは重要度が低いのでスキップ（階段・自販機などは例外）
-            const name = tags.name || tags.alt_name || "";
-            if (!name && tags.highway !== "steps" && tags.amenity !== "vending_machine") return;
+            // 名前の取得とフィルタ
+            let name = tags.name || tags.alt_name || tags.location_name || "";
+            // OSM上で特定の川（例: 二河川）が誤って目立つ場合は除外
+            if (name && /二河川/.test(name)) return;
+
+            // 名前がない場合でも、川や水域は表示候補にする
+            if (!name && !(tags.highway === "steps" || tags.amenity === "vending_machine")) {
+                if (type === "水辺・川・海") {
+                    name = tags.waterway || tags.natural || '無名の水辺';
+                } else {
+                    // 非表示（名前必須）
+                    return;
+                }
+            }
 
             addSpotToMap(elLat, elLon, type, name || type, "OSM", bg, icon);
         });
