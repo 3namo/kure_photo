@@ -362,10 +362,49 @@ async function fetchKureData(endpointId, label) {
         let count = 0;
         // レスポンスは配列の場合とオブジェクト（data/items）を含む場合がある
         const items = Array.isArray(data) ? data : (data.data || data.items || []);
+        function extractLatLon(it) {
+            if (!it) return [null, null];
+            // top-level
+            const candidates = [
+                [it.latitude, it.longitude],
+                [it.lat, it.lon],
+                [it.lat, it.lng],
+                [it.lat, it.long],
+                [it.latitude__ , it.longitude__],
+                [it.latitude_wgs84, it.longitude_wgs84]
+            ];
+            for (const [a,b] of candidates) {
+                if (a !== undefined && b !== undefined && a !== null && b !== null) return [Number(a), Number(b)];
+            }
+            // nested location objects
+            const loc = it.location || it.location_data || it.position || it.pos || it.locationObject;
+            if (loc) {
+                const nested = [
+                    [loc.latitude, loc.longitude],
+                    [loc.lat, loc.lon],
+                    [loc.lat, loc.lng],
+                    [loc.latitude_wgs84, loc.longitude_wgs84]
+                ];
+                for (const [a,b] of nested) {
+                    if (a !== undefined && b !== undefined && a !== null && b !== null) return [Number(a), Number(b)];
+                }
+            }
+            // some APIs use 'geometry' or 'point'
+            if (it.geometry && it.geometry.coordinates) {
+                // GeoJSON [lon, lat]
+                const c = it.geometry.coordinates;
+                return [Number(c[1]), Number(c[0])];
+            }
+            if (it.point && it.point.coordinates) {
+                const c = it.point.coordinates; // [lon, lat]
+                return [Number(c[1]), Number(c[0])];
+            }
+            return [null, null];
+        }
+
         items.forEach(item => {
-            const iLat = item.latitude || item.lat || item.latitude__ || null;
-            const iLon = item.longitude || item.lon || item.long || item.lng || null;
-            const iName = item.name || item.title || item.location_name || item.location || "名称不明";
+            const [iLat, iLon] = extractLatLon(item);
+            const iName = item.name || item.title || item.location_name || item.location || item.place || "名称不明";
             if (iLat && iLon) {
                 const dist = Math.sqrt(Math.pow(currentLat - iLat, 2) + Math.pow(currentLon - iLon, 2));
                 if (dist < 0.02) { // 近場のみ
@@ -374,6 +413,14 @@ async function fetchKureData(endpointId, label) {
                 }
             }
         });
+        // デバッグ: ヒット数が0の場合、サンプルをログ表示
+        if (count === 0 && items && items.length > 0) {
+            const sample = items.slice(0,3).map(it => {
+                try { return JSON.stringify(it, Object.keys(it).slice(0,10)); } catch(e) { return '(no preview)'; }
+            }).join('\n---\n');
+            log(`🔍 呉API取得は成功しましたが、近傍の緯度経度が検出できませんでした。サンプル項目:
+${sample}`);
+        }
         log(`⚓️ ${label}: ${count}件`);
     } catch(e) { log(`❌ 呉APIエラー: ${e.message}`); }
 }
