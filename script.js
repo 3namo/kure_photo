@@ -384,7 +384,7 @@ async function fetchOverpass(lat, lon) {
                 }
             }
 
-            addSpotToMap(elLat, elLon, type, name || type, "OSM", bg, icon);
+            addSpotToMap(elLat, elLon, type, name || type, "OSM", bg, icon, el.id);
         });
         log(`🌍 OSM: ${data.elements.length}件`);
     } catch(e) { log(`❌ OSMエラー: ${e.message}`); }
@@ -490,11 +490,11 @@ ${sample}`);
     } catch(e) { log(`❌ 呉APIエラー: ${e.message}`); }
 }
 
-function addSpotToMap(lat, lon, type, name, source, bgClass, iconClass="fa-map-pin") {
+function addSpotToMap(lat, lon, type, name, source, bgClass, iconClass="fa-map-pin", osmId=null) {
     // 重複チェック
     if(gatheredSpots.some(s => s.name === name && Math.abs(s.lat - lat) < 0.0001)) return;
 
-    gatheredSpots.push({ lat, lon, type, name, source });
+    gatheredSpots.push({ lat, lon, type, name, source, osmId });
     // 寺院は卍で表示したい（視認性のため、アイコンは文字で表示）
     let html = '';
     if (bgClass === 'bg-temple') {
@@ -641,62 +641,79 @@ async function drawSmartRoute(routePoints) {
     // ルートが所要時間の下限より短い場合、候補スポットを追加して延伸を試みる
     async function tryExpandRouteToMinMinutes(pts, minAllowed, requested) {
         // 候補は gatheredSpots の中からまだ使われていないスポット
-        const used = new Set(pts.map(p => (p.name || p.lat + ',' + p.lon)));
+        const used = new Set(pts.map(p => (p.name || (p.lat + ',' + p.lon))));
         let candidates = gatheredSpots.filter(s => !used.has(s.name));
         if (!candidates || candidates.length === 0) return { pts, data: null, walkMinutes: 0, distMeters: 0 };
 
-        // 優先ルール: ユーザーが「川」や「水」を希望している場合は水辺を優先
+        // ヘルパ: 距離計算 (おおまかなメートル換算、ハバースインは過剰なので簡易版で十分)
+        function approxMeters(aLat, aLon, bLat, bLon) {
+            const R = 6371000; // earth radius m
+            const toRad = Math.PI / 180;
+            const dLat = (bLat - aLat) * toRad;
+            const dLon = (bLon - aLon) * toRad;
+            const lat1 = aLat * toRad;
+            const lat2 = bLat * toRad;
+            const sinDLat = Math.sin(dLat/2);
+            const sinDLon = Math.sin(dLon/2);
+            const A = sinDLat*sinDLat + Math.cos(lat1)*Math.cos(lat2)*sinDLon*sinDLon;
+            const C = 2 * Math.atan2(Math.sqrt(A), Math.sqrt(1-A));
+            return R * C;
+        }
+
+        // 最終点とゴール(最後のポイント)を取得
+        const startPt = pts[0];
+        const goalPt = pts[pts.length - 1];
+
+        // 各候補について「挿入したときに増える概算距離」を計算して降順ソート
+        const scored = candidates.map(c => {
+            // 挿入地点は基本的にゴール直前に挿入する想定
+            const last = goalPt; // 現在の終端
+            const base = approxMeters(last.lat, last.lon, startPt.lat, startPt.lon); // not used but kept for clarity
+            const direct = approxMeters(last.lat, last.lon, goalPt.lat, goalPt.lon);
+            const viaCand = approxMeters(last.lat, last.lon, c.lat, c.lon) + approxMeters(c.lat, c.lon, goalPt.lat, goalPt.lon);
+            const addedMeters = viaCand - direct;
+            return { cand: c, addedMeters };
+        }).filter(s => s.addedMeters > 10); // ほとんど増えない候補は無視
+
+        // ユーザームードで水辺優先のバイアスをかける
         const mood = (window.userMood || '').toString();
-        candidates.sort((a, b) => {
-            const aWater = (a.type || '').includes('水') ? 0 : 1;
-            const bWater = (b.type || '').includes('水') ? 0 : 1;
-            if (mood.includes('川') || mood.includes('水') || mood.includes('海')) {
-                if (aWater !== bWater) return aWater - bWater; // 水辺優先
-            }
-            // 共通: 終点（最後のpt）からの距離が近い順
-            const last = pts[pts.length - 1];
-            const da = Math.hypot(last.lat - a.lat, last.lon - a.lon);
-            const db = Math.hypot(last.lat - b.lat, last.lon - b.lon);
-            return da - db;
-        });
+        if (mood.includes('川') || mood.includes('水') || mood.includes('海')) {
+            scored.forEach(s => { if ((s.cand.type||'').includes('水')) s.addedMeters *= 1.5; });
+        }
 
-        let added = 0;
-        let localData = null;
-        let localDist = 0;
-        let localMinutes = 0;
+        scored.sort((a,b) => b.addedMeters - a.addedMeters);
 
-        // 最大追加数を制限（無限ループ防止）
-        const MAX_ADDITIONS = 6;
-        for (const cand of candidates) {
+        let ptsCopy = pts.slice();
+        let localData = null; let localDist = 0; let localMinutes = 0;
+        const MAX_ADDITIONS = 10; let added = 0;
+
+        for (const s of scored) {
             if (added >= MAX_ADDITIONS) break;
-            // 最終地点の直前に挿入して経路を延ばす
-            const insertPos = Math.max(1, pts.length - 1);
-            const newPt = { name: cand.name || '追加スポット', lat: cand.lat, lon: cand.lon, photo_tip: '' };
-            pts.splice(insertPos, 0, newPt);
-            localData = await getOsrmForPoints(pts);
+            const c = s.cand;
+            const insertPos = Math.max(1, ptsCopy.length - 1);
+            const newPt = { name: c.name || '追加スポット', lat: c.lat, lon: c.lon, photo_tip: '' };
+            ptsCopy.splice(insertPos, 0, newPt);
+            localData = await getOsrmForPoints(ptsCopy);
             if (localData && localData.routes && localData.routes.length > 0) {
                 localDist = localData.routes[0].distance;
                 localMinutes = Math.round((localDist / 1000) / 4.0 * 60);
-            } else {
-                localDist = 0; localMinutes = 0;
-            }
+            } else { localDist = 0; localMinutes = 0; }
             added++;
-            log(`➕ 追加スポット: ${newPt.name} を挿入。所要 ${localMinutes}分`);
+            log(`➕ 追加候補を挿入: ${newPt.name} (推定増分 ${Math.round(s.addedMeters)}m) => 所要 ${localMinutes}分`);
             if (localMinutes >= minAllowed) {
                 log(`✅ 追加により下限 ${minAllowed}分 を満たしました。`);
-                return { pts, data: localData, walkMinutes: localMinutes, distMeters: localDist };
+                return { pts: ptsCopy, data: localData, walkMinutes: localMinutes, distMeters: localDist };
             }
         }
 
-        // まだ短い場合、ルート間に中点を挿入して微妙な迂回を作る（最大4点）
+        // 中間点挿入も試みる（最後の手段）
         if (localMinutes < minAllowed) {
-            const maxMidpoints = 4;
-            let midsAdded = 0;
-            for (let i = 0; i < pts.length - 1 && midsAdded < maxMidpoints; i++) {
-                const a = pts[i]; const b = pts[i+1];
+            const maxMidpoints = 6; let midsAdded = 0;
+            for (let i = 0; i < ptsCopy.length - 1 && midsAdded < maxMidpoints; i++) {
+                const a = ptsCopy[i]; const b = ptsCopy[i+1];
                 const mid = { name: 'ちょっと寄り道', lat: (a.lat + b.lat)/2, lon: (a.lon + b.lon)/2, photo_tip: '' };
-                pts.splice(i+1, 0, mid);
-                localData = await getOsrmForPoints(pts);
+                ptsCopy.splice(i+1, 0, mid);
+                localData = await getOsrmForPoints(ptsCopy);
                 if (localData && localData.routes && localData.routes.length > 0) {
                     localDist = localData.routes[0].distance;
                     localMinutes = Math.round((localDist / 1000) / 4.0 * 60);
@@ -705,18 +722,104 @@ async function drawSmartRoute(routePoints) {
                 log(`🔁 中間点挿入で所要 ${localMinutes}分`);
                 if (localMinutes >= minAllowed) {
                     log(`✅ 中間点で下限を満たしました。`);
-                    return { pts, data: localData, walkMinutes: localMinutes, distMeters: localDist };
+                    return { pts: ptsCopy, data: localData, walkMinutes: localMinutes, distMeters: localDist };
                 }
-                // ループ継続でさらに中点を追加
             }
         }
 
-        // ここまで来ても満たさなければ現在の状態を返す
-        return { pts, data: localData, walkMinutes: localMinutes, distMeters: localDist };
+        return { pts: ptsCopy, data: localData, walkMinutes: localMinutes, distMeters: localDist };
+    }
+
+    // 指定された OSM way/relation のジオメトリを取得する（Overpass）
+    async function fetchOverpassGeometry(osmId, osmType="way") {
+        try {
+            log(`🌊 水路ジオメトリ取得: ${osmType}/${osmId} を Overpass から取得します`);
+            const q = `[out:json][timeout:25]; ${osmType}(${osmId}); out geom;`;
+            const servers = [
+                'https://overpass-api.de/api/interpreter?data=',
+                'https://lz4.overpass-api.de/api/interpreter?data=',
+                'https://overpass.openstreetmap.fr/api/interpreter?data='
+            ];
+            let txt = null; let data = null;
+            for (const s of servers) {
+                try {
+                    const r = await fetch(s + encodeURIComponent(q));
+                    txt = await r.text();
+                    if (r.ok && (txt.trim().startsWith('{') || txt.trim().startsWith('['))) { data = JSON.parse(txt); break; }
+                } catch(e) { log(`❌ Overpass geom ${s} エラー: ${e.message}`); }
+            }
+            if (!data || !data.elements || data.elements.length === 0) {
+                log('❗ ジオメトリ取得できませんでした'); return null;
+            }
+            const el = data.elements[0];
+            // geometryは [{lat,lon}, ...]
+            const coords = (el.geometry || []).map(p => [p.lat, p.lon]);
+            return coords;
+        } catch(e) { log(`❌ fetchOverpassGeometry エラー: ${e.message}`); return null; }
+    }
+
+    // 線上の座標配列から等間隔で n 個の点を抽出する
+    function samplePointsOnLine(latlonArr, n) {
+        if (!latlonArr || latlonArr.length === 0) return [];
+        if (n <= 0) return [];
+        // 距離累積
+        const dists = [0];
+        for (let i = 1; i < latlonArr.length; i++) {
+            const a = latlonArr[i-1]; const b = latlonArr[i];
+            const m = Math.hypot((a[0]-b[0]), (a[1]-b[1]));
+            dists.push(dists[dists.length-1] + m);
+        }
+        const total = dists[dists.length-1];
+        if (total === 0) return [latlonArr[0]];
+        const out = [];
+        for (let k = 0; k < n; k++) {
+            const target = (k/(n-1)) * total;
+            // find segment
+            let idx = 0; while (idx < dists.length-1 && dists[idx+1] < target) idx++;
+            const a = latlonArr[idx]; const b = latlonArr[Math.min(idx+1, latlonArr.length-1)];
+            const tSeg = (target - dists[idx]) / Math.max(1e-9, (dists[idx+1] - dists[idx] || 1e-9));
+            const lat = a[0] + (b[0]-a[0]) * tSeg;
+            const lon = a[1] + (b[1]-a[1]) * tSeg;
+            out.push([lat, lon]);
+        }
+        return out;
+    }
+
+    // 川沿い希望なら、近い水路のジオメトリを取得して経由点を生成し、ptsの先頭直後へ挿入する
+    async function injectRiverWaypointsIfRequested(pts, requested) {
+        const mood = (window.userMood || '').toString();
+        if (!(mood.includes('川') || mood.includes('水') || mood.includes('海'))) return pts;
+        // gatheredSpots から水辺の OSM id を持つものを探す
+        const waters = gatheredSpots.filter(s => (s.type||'').includes('水') && s.osmId);
+        if (!waters || waters.length === 0) return pts;
+        // startに最も近い水要素を選ぶ
+        const start = { lat: currentLat, lon: currentLon };
+        waters.sort((a,b) => {
+            const da = Math.hypot(start.lat - a.lat, start.lon - a.lon);
+            const db = Math.hypot(start.lat - b.lat, start.lon - b.lon);
+            return da - db;
+        });
+        const chosen = waters[0];
+        const geom = await fetchOverpassGeometry(chosen.osmId, 'way');
+        if (!geom || geom.length < 2) return pts;
+        // 作成する経由点数は所要時間に依存（長時間なら多め）
+        const approxCount = Math.min(8, Math.max(3, Math.round(requested / 15)));
+        const samples = samplePointsOnLine(geom, approxCount);
+        // 生成点をptsの先頭直後に挿入（スタート→水路→既存ルート）
+        const newPts = pts.slice();
+        const insertPos = 1;
+        const wp = samples.map((s,i) => ({ name: `${chosen.name||'水辺'} (${i+1})`, lat: s[0], lon: s[1], photo_tip: '' }));
+        newPts.splice(insertPos, 0, ...wp);
+        log(`🌊 川沿いポイントを ${wp.length} 件挿入しました（${chosen.name||'無名の水辺'}）`);
+        return newPts;
     }
 
     try {
         let pts = routePoints.slice();
+        // 川沿い希望があれば先に川の経由点を注入しておく
+        if (window.userMood && (window.userMood.includes('川') || window.userMood.includes('水') || window.userMood.includes('海'))) {
+            try { pts = await injectRiverWaypointsIfRequested(pts, requested); } catch(e) { log('❌ 川経由点注入でエラー: ' + e.message); }
+        }
         let data = await getOsrmForPoints(pts);
         let distMeters = 0;
         let walkMinutes = 0;
