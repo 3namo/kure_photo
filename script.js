@@ -193,18 +193,6 @@ function toggleDatasetInput() {
     }
 }
 
-function toggleLogArea() {
-    const container = document.getElementById('log-area');
-    const arrow = document.getElementById('log-arrow');
-    if(container.style.display === 'none') {
-        container.style.display = 'block';
-        arrow.className = 'fa-solid fa-chevron-up';
-    } else {
-        container.style.display = 'none';
-        arrow.className = 'fa-solid fa-chevron-down';
-    }
-}
-
 setInterval(() => {
     const now = new Date();
     const timeStr = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });

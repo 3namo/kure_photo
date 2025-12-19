@@ -19,9 +19,9 @@ body {
    サイドバー（ここがスクロールします）
    ========================================= */
 #sidebar {
-    width: 500px;
+    width: 700px;
     background: #f8f9fa; 
-    padding: 20px; /* パディングを少し狭く調整 */
+    padding: 15px; 
     box-shadow: 2px 0 5px rgba(0,0,0,0.1);
     
     /* ★重要: 高さを画面に合わせ、中身が多い場合のみスクロール */
@@ -181,11 +181,73 @@ button#btn-search {
     width: 100%; padding: 12px; background: #007bff; color: white;
     border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 1.1em; transition: 0.2s;
     box-shadow: 0 4px 6px rgba(0,123,255,0.2);
+    margin-bottom: 10px;
 }
 button#btn-search:hover { background: #0056b3; box-shadow: 0 2px 4px rgba(0,123,255,0.2); }
 button#btn-search:disabled { background: #ccc; cursor: not-allowed; box-shadow: none; }
 
-#log-area { font-size: 0.85em; color: #666; margin-bottom: 15px; height: 80px; overflow-y: scroll; background: #eee; padding: 10px; border-radius: 4px;}
+/* ===== 設定パネルのアコーディオン ===== */
+.settings-accordion {
+    margin-bottom: 10px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    background: #fff;
+    overflow: hidden;
+}
+
+.settings-summary {
+    padding: 10px 12px;
+    background-color: #f5f5f5;
+    cursor: pointer;
+    font-weight: bold;
+    color: #333;
+    outline: none;
+    list-style: none;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.9em;
+    transition: background-color 0.2s;
+    user-select: none;
+}
+
+.settings-summary:hover {
+    background-color: #e8e8e8;
+}
+
+.settings-accordion[open] > .settings-summary {
+    background-color: #e8e8e8;
+    border-bottom: 1px solid #ddd;
+}
+
+.settings-summary .accordion-arrow {
+    font-size: 0.75em;
+    color: #666;
+    transition: transform 0.2s;
+}
+
+.settings-accordion[open] > .settings-summary .accordion-arrow {
+    transform: rotate(180deg);
+}
+
+.settings-accordion summary::-webkit-details-marker { display: none; }
+
+.settings-content {
+    padding: 12px;
+    background: white;
+}
+
+#log-area { 
+    font-size: 0.85em; 
+    color: #666; 
+    height: 100px;
+    max-height: 150px;
+    overflow-y: auto;
+    background: #f8f8f8;
+    padding: 10px;
+    border-radius: 4px;
+    border-left: 3px solid #ff9800;
+}
 
 /* =========================================
    天気ウィジェット (コンパクト版)
@@ -194,7 +256,7 @@ button#btn-search:disabled { background: #ccc; cursor: not-allowed; box-shadow: 
     background: #fff; 
     border-radius: 8px; 
     padding: 10px 15px; /* 上下のパディングを縮小 */
-    margin-bottom: 20px;
+    margin-bottom: 15px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.08); 
     border-left: 5px solid #007bff;
 }
@@ -246,61 +308,57 @@ button#btn-search:disabled { background: #ccc; cursor: not-allowed; box-shadow: 
 #forecast-container::-webkit-scrollbar-thumb { background: #ddd; border-radius: 3px; }
 
 /* =========================================
-   AI結果エリア & アコーディオン
-   ========================================= */
-/* アコーディオン全体 */
+   AI結果エリア & アコーディオン（重要！）
+   =========================================*/
+/* AI結果アコーディオン */
 .ai-accordion {
-    margin-top: 15px;
-    border: 1px solid #ddd;
-    border-radius: 6px;
+    border: 2px solid #007bff;
+    border-radius: 8px;
     background: #fff;
     overflow: hidden;
-    transition: all 0.3s;
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 300px;
 }
 
-/* クリック部分 (Summary) */
-.ai-accordion summary {
-    padding: 10px 12px;
-    background-color: #f0f8ff; /* 薄い青 */
+.ai-summary {
+    padding: 12px 15px;
+    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+    color: white;
     cursor: pointer;
     font-weight: bold;
-    color: #333;
     outline: none;
     list-style: none;
     display: flex;
     justify-content: space-between;
     align-items: center;
     font-size: 0.95em;
+    user-select: none;
 }
-/* Chrome/Safari用マーカー削除 */
+
 .ai-accordion summary::-webkit-details-marker { display: none; }
 
-.ai-accordion[open] summary {
-    background-color: #e6f2ff;
-    border-bottom: 1px solid #eee;
+.ai-accordion[open] > .ai-summary {
+    background: linear-gradient(135deg, #0056b3 0%, #003d82 100%);
 }
 
-/* 矢印アイコン */
-.ai-accordion summary::after {
-    content: "▼";
-    font-size: 0.8em;
-    color: #666;
+.ai-summary .accordion-arrow {
+    font-size: 0.85em;
     transition: transform 0.2s;
 }
 
-.ai-accordion[open] summary::after {
+.ai-accordion[open] > .ai-summary .accordion-arrow {
     transform: rotate(180deg);
 }
 
-/* 結果表示エリア本体 */
-#ai-response {
-    flex-grow: 1; 
-    padding: 15px; 
-    padding-bottom: 80px; /* 一番下に余白を作る */
-    background: white; 
-    max-height: 600px; 
+.ai-response-content {
+    flex-grow: 1;
+    padding: 15px;
+    background: white;
     overflow-y: auto;
-    font-size: 1em; line-height: 1.6;
+    font-size: 1em;
+    line-height: 1.6;
 }
 
 .route-theme { 

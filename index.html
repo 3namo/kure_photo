@@ -39,64 +39,79 @@
             <div id="forecast-container"></div>
         </div>
         
-        <div class="control-group">
-            <label>📍 現在地の指定方式</label>
-            <div class="location-mode-toggle">
-                <label class="toggle-label">
-                    <input type="checkbox" id="gps-mode-toggle" onchange="toggleLocationMode()">
-                    <span class="toggle-slider"></span>
-                    <span class="mode-text">GPS自動取得: <span id="mode-status">OFF (マップクリック)</span></span>
-                </label>
-            </div>
-            <div class="hint" id="location-hint">※マップをクリックして現在地を指定してください</div>
-        </div>
-
-        <div class="control-group">
-            <label>1. Gemini APIキー (必須)</label>
-            <input type="password" id="gemini-key" placeholder="AI Studioで取得したキーを入力">
-        </div>
-
-        <div class="control-group">
-            <div class="accordion-header" onclick="toggleDatasetInput()">
-                <label style="cursor:pointer; margin:0;">2. 呉市データセットID <small>(設定)</small></label>
-                <i id="dataset-arrow" class="fa-solid fa-chevron-down"></i>
-            </div>
+        <!-- 設定パネル（開閉可能） -->
+        <details class="settings-accordion" open>
+            <summary class="settings-summary">
+                <i class="fa-solid fa-sliders"></i> 設定パネル
+                <i class="accordion-arrow fa-solid fa-chevron-down"></i>
+            </summary>
             
-            <div id="dataset-container" style="display:none; margin-top:10px;">
-                <div class="hint">※カタログURL末尾のIDを入力</div>
-                <input type="text" id="id-manhole" placeholder="デザインマンホール" value="design-manhole-list-1">
-                <input type="text" id="id-culture" placeholder="文化財・歴史" value="cultural-property-list-1">
-                <input type="text" id="id-shelter" placeholder="避難所(絶景用)" value="shelter-1">
+            <div class="settings-content">
+                <div class="control-group">
+                    <label>📍 現在地の指定方式</label>
+                    <div class="location-mode-toggle">
+                        <label class="toggle-label">
+                            <input type="checkbox" id="gps-mode-toggle" onchange="toggleLocationMode()">
+                            <span class="toggle-slider"></span>
+                            <span class="mode-text">GPS自動取得: <span id="mode-status">OFF (マップクリック)</span></span>
+                        </label>
+                    </div>
+                    <div class="hint" id="location-hint">※マップをクリックして現在地を指定してください</div>
+                </div>
+
+                <div class="control-group">
+                    <label>1. Gemini APIキー (必須)</label>
+                    <input type="password" id="gemini-key" placeholder="AI Studioで取得したキーを入力">
+                </div>
+
+                <div class="control-group">
+                    <div class="accordion-header" onclick="toggleDatasetInput()">
+                        <label style="cursor:pointer; margin:0;">2. 呉市データセットID <small>(設定)</small></label>
+                        <i id="dataset-arrow" class="fa-solid fa-chevron-down"></i>
+                    </div>
+                    
+                    <div id="dataset-container" style="display:none; margin-top:10px;">
+                        <div class="hint">※カタログURL末尾のIDを入力</div>
+                        <input type="text" id="id-manhole" placeholder="デザインマンホール" value="design-manhole-list-1">
+                        <input type="text" id="id-culture" placeholder="文化財・歴史" value="cultural-property-list-1">
+                        <input type="text" id="id-shelter" placeholder="避難所(絶景用)" value="shelter-1">
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label>3. 今の気分・テーマ</label>
+                    <input type="text" id="user-mood" placeholder="例: 静かで落ち着ける場所、工場萌え">
+                </div>
+
+                <div class="control-group">
+                    <label>4. 所要時間 (分)</label>
+                    <input type="number" id="walk-duration" placeholder="例: 70" value="70">
+                    
+                    <label style="margin-top:10px;">5. ゴール地点 (任意)</label>
+                    <div class="hint">※空欄ならAIが良い場所を提案します</div>
+                    <input type="text" id="final-dest" placeholder="例: 呉駅、大和ミュージアム">
+                </div>
             </div>
-        </div>
-
-        <div class="control-group">
-            <label>3. 今の気分・テーマ</label>
-            <input type="text" id="user-mood" placeholder="例: 静かで落ち着ける場所、工場萌え">
-        </div>
-
-        <div class="control-group">
-            <label>4. 所要時間 (分)</label>
-            <input type="number" id="walk-duration" placeholder="例: 70" value="70">
-            
-            <label style="margin-top:10px;">5. ゴール地点 (任意)</label>
-            <div class="hint">※空欄ならAIが良い場所を提案します</div>
-            <input type="text" id="final-dest" placeholder="例: 呉駅、大和ミュージアム">
-        </div>
-
-        <div class="control-group">
-            <div class="accordion-header" onclick="toggleLogArea()">
-                <label style="cursor:pointer; margin:0;">システムログ <small>(クリックで確認)</small></label>
-                <i id="log-arrow" class="fa-solid fa-chevron-down"></i>
-            </div>
-            <div id="log-area" style="display:none; margin-top:10px;">システムログ: 待機中...</div>
-        </div>
+        </details>
 
         <button id="btn-search" onclick="askAI()" disabled>AIにプランを聞く</button>
         
-        <details id="ai-result-details" class="ai-accordion">
-            <summary>🤖 AIプラン結果エリア <small>(クリックで開閉)</small></summary>
-            <div id="ai-response">地図をクリックすると探索を開始します。</div>
+        <!-- ログパネル（開閉可能） -->
+        <details class="settings-accordion">
+            <summary class="settings-summary">
+                <i class="fa-solid fa-terminal"></i> システムログ
+                <i class="accordion-arrow fa-solid fa-chevron-down"></i>
+            </summary>
+            <div id="log-area" class="settings-content">システムログ: 待機中...</div>
+        </details>
+        
+        <!-- AI結果パネル（重要 - 常に表示） -->
+        <details id="ai-result-details" class="ai-accordion" open>
+            <summary class="ai-summary">
+                <i class="fa-solid fa-map"></i> 🤖 AIプラン結果
+                <i class="accordion-arrow fa-solid fa-chevron-up"></i>
+            </summary>
+            <div id="ai-response" class="ai-response-content">地図をクリックすると探索を開始します。</div>
         </details>
     </div>
 
