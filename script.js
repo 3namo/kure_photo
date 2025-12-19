@@ -373,7 +373,6 @@ async function askAI() {
     if(!geminiKey) { alert("Gemini APIキーを入力してください"); return; }
     if(gatheredSpots.length === 0) { alert("周辺にスポットがありません"); return; }
 
-    // ★改善箇所: ボタンを押したら強制的にアコーディオンを開く
     const detailsElement = document.getElementById('ai-result-details');
     if(detailsElement) detailsElement.open = true;
 
@@ -381,47 +380,24 @@ async function askAI() {
     responseArea.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> AIがルートを計算中...';
     routeLayer.clearLayers();
 
-    // ★改善: スポットを気分・テーマに基づいてフィルタリング・ソート
-    const filteredAndSortedSpots = filterAndRankSpots(gatheredSpots, mood);
-    
-    // スポットをカテゴリ別に整理
-    const spotsWithDetails = filteredAndSortedSpots
-        .slice(0, 40) 
-        .map(s => ({ 
-            name: s.name, 
-            type: s.type, 
-            lat: s.lat, 
-            lon: s.lon,
-            category: categorizeSport(s.type)
-        }));
+    const spotsListJson = gatheredSpots
+        .sort(() => 0.5 - Math.random())
+        .slice(0, 30) 
+        .map(s => ({ name: s.name, type: s.type, lat: s.lat, lon: s.lon }));
 
     const prompt = `
 あなたは呉市のフォトスポットガイドです。
-提供されたスポット候補から、ユーザーの希望に最も合致した散歩ルートを1つ作成してください。
+以下のデータから、最も写真映えする散歩ルートを1つ作成してください。
 
-【ユーザーの希望】
-- 気分・テーマ: "${mood}"
-- 所要時間: ${duration}分（移動と撮影を含めて最大限活用してください）
-- ゴール地点: "${destination}"
-- 天気: ${weatherDescription}（予報: ${forecastText}）
+【条件】
+- 現在地からスタートすること。
+- 所要時間: ${duration}分を目安にしてください。移動と撮影を含めて、この時間を**最大限活用する**充実したルートにしてください。短時間で終わるルートはNGです。
+- ゴール地点: "${destination}" にすること。
+- 天気(${weatherDescription}, 予報:${forecastText})と気分(${mood})を考慮すること。
+- 長文の説明は不要。
 
-【重要な指示】
-1. **スポット選定の厳密性**: ユーザーが「神社」と明示している場合は神社のみ、「川沿い」と言っている場合は水辺のスポットを優先してください
-2. **テーマの一貫性**: ユーザーの気分・テーマに反するスポットは避けてください
-3. **論理的な順序**: スポット間の距離と移動時間を考慮し、効率的で自然なルートを作成してください
-4. **短時間ルートの禁止**: 指定時間を有効活用してください（${duration}分で回るには無理のあるルートになってはいけません）
-5. **天気の考慮**: ${weatherDescription}の天気で撮影に適したスポットを選んでください
-
-【スポットカテゴリ情報】
-各スポットは以下のカテゴリに分類されています。テーマに合わせて選定してください：
-- 神社・寺社: 宗教的建造物（ユーザーが「神社」を希望した場合は「寺社」の中から神社のみを選んでください）
-- 歴史・文化: 史跡・レトロ建造物・文化財
-- 自然・風景: 絶景・川・橋・水辺
-- インフラ・工業: 工場・クレーン・街灯・橋などの構造物
-- 階段・路地: 歩行ルート（「歩く」をテーマにしている場合は優先）
-
-【JSON応答フォーマット】
-回答は必ず以下のJSONフォーマットのみで行うこと。Markdownのコードブロックは不要：
+【重要指令】
+回答は必ず以下のJSONフォーマットのみで行うこと。Markdownのコードブロックは不要。
 
 {
   "theme": "ルートの短いキャッチコピー",
@@ -431,12 +407,17 @@ async function askAI() {
       "lat": 緯度(数値),
       "lon": 経度(数値),
       "photo_tip": "写真のヒント"
+    },
+    {
+      "name": "スポット名2",
+      "lat": 緯度, "lon": 経度,
+      "photo_tip": "写真のヒント"
     }
   ]
 }
 
-【周辺スポット候補データ（カテゴリ付き）】
-${JSON.stringify(spotsWithDetails)}
+【周辺スポット候補データ】
+${JSON.stringify(spotsListJson)}
 `;
 
     try {
@@ -459,90 +440,16 @@ ${JSON.stringify(spotsWithDetails)}
 
         log("🗺️ ルートデータを受信。ナビゲーション取得中...");
         
-        // 念のためここでも開く
         if(detailsElement) detailsElement.open = true;
 
         await drawSmartRoute(routeData.route);
 
     } catch(e) {
         console.error(e);
-        // エラー時も見せる
         if(detailsElement) detailsElement.open = true;
         responseArea.innerHTML = `<div style="color:red; font-weight:bold;">ルート生成エラー</div><small>${e.message}</small>`;
         log(`❌ エラー: ${e.message}`);
     }
-}
-
-// ★新規関数: 気分・テーマに基づいてスポットをフィルタリング・ランク付け
-function filterAndRankSpots(spots, mood) {
-    const moodLower = mood.toLowerCase();
-    
-    // スポットのスコアを計算
-    const spotsWithScore = spots.map(spot => {
-        let score = 0;
-        const spotTypeLower = spot.type.toLowerCase();
-        const spotNameLower = spot.name.toLowerCase();
-        
-        // 気分に基づくマッチング
-        const keywords = {
-            shrine: ['神社', 'torii'],
-            temple: ['寺', '寺社'],
-            historical: ['史跡', 'レトロ', '歴史', '文化財'],
-            nature: ['川', '水', '絶景', '景観', 'viewpoint'],
-            steps: ['階段', 'steps'],
-            path: ['路地', 'path', '小道'],
-            industrial: ['工場', 'クレーン', 'crane', '橋'],
-            water: ['川', '水', 'river', 'water']
-        };
-        
-        // 完全一致チェック
-        if (moodLower.includes('神社') && spotTypeLower.includes('神社')) score += 50;
-        else if (moodLower.includes('寺') && spotTypeLower.includes('寺')) score += 50;
-        else if (moodLower.includes('神社') && spotTypeLower.includes('寺')) score -= 30; // ペナルティ
-        
-        // 川沿いのテーマ
-        if (moodLower.includes('川') || moodLower.includes('水')) {
-            if (spotTypeLower.includes('川') || spotTypeLower.includes('水') || spotTypeLower.includes('絶景')) score += 30;
-        }
-        
-        // 歩く/階段のテーマ
-        if (moodLower.includes('歩') || moodLower.includes('階段')) {
-            if (spotTypeLower.includes('階段') || spotTypeLower.includes('路地')) score += 25;
-        }
-        
-        // 工場/インフラのテーマ
-        if (moodLower.includes('工場') || moodLower.includes('インフラ')) {
-            if (spotTypeLower.includes('クレーン') || spotTypeLower.includes('工場')) score += 35;
-        }
-        
-        // 歴史/文化のテーマ
-        if (moodLower.includes('歴史') || moodLower.includes('文化') || moodLower.includes('レトロ')) {
-            if (spotTypeLower.includes('史跡') || spotTypeLower.includes('レトロ')) score += 30;
-        }
-        
-        return { ...spot, score };
-    });
-    
-    // スコアでソート（高い順）、その後距離でランダムにソート
-    return spotsWithScore
-        .sort((a, b) => b.score - a.score)
-        .map(s => ({ ...s, sortKey: Math.random() * 0.3 })) // ランダム要素を減らす
-        .sort((a, b) => b.score - a.score);
-}
-
-// ★新規関数: スポットタイプをカテゴリに分類
-function categorizeSport(spotType) {
-    const type = spotType.toLowerCase();
-    
-    if (type.includes('神社') || type.includes('torii')) return '神社';
-    if (type.includes('寺')) return '寺社';
-    if (type.includes('史跡') || type.includes('レトロ') || type.includes('文化財')) return '歴史・文化';
-    if (type.includes('絶景') || type.includes('川') || type.includes('water') || type.includes('viewpoint')) return '自然・風景';
-    if (type.includes('工場') || type.includes('クレーン') || type.includes('橋') || type.includes('crane')) return 'インフラ・工業';
-    if (type.includes('階段') || type.includes('steps')) return '階段';
-    if (type.includes('路地') || type.includes('path')) return '路地';
-    
-    return 'その他';
 }
 
 async function drawSmartRoute(routePoints) {
