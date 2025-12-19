@@ -38,6 +38,9 @@ body {
     position: relative; 
     flex-shrink: 0;
     transition: none;
+
+    /* allow flex children with overflow to shrink/scroll correctly */
+    min-height: 0;
 }
 
 /* --- スクロールバーのデザイン強化 (Chrome, Safari, Edge) --- */
@@ -193,6 +196,9 @@ button#btn-search:disabled { background: #ccc; cursor: not-allowed; box-shadow: 
     border-radius: 6px;
     background: #fff;
     overflow: hidden;
+
+    /* ensure internal scrolling works inside flex parent */
+    min-height: 0;
 }
 
 .settings-summary {
@@ -237,14 +243,20 @@ button#btn-search:disabled { background: #ccc; cursor: not-allowed; box-shadow: 
     background: white;
     max-height: 400px;
     overflow-y: auto;
+
+    /* mobile/webkit smooth scrolling */
+    -webkit-overflow-scrolling: touch;
 }
 
 #log-area { 
     font-size: 0.85em; 
     color: #666; 
-    height: 100px;
-    max-height: 150px;
+    /* allow the log area to grow but cap to viewport to ensure scrollability */
+    height: auto;
+    min-height: 80px;
+    max-height: calc(100vh - 280px);
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
     background: #f8f8f8;
     padding: 10px;
     border-radius: 4px;
@@ -322,6 +334,9 @@ button#btn-search:disabled { background: #ccc; cursor: not-allowed; box-shadow: 
     display: flex;
     flex-direction: column;
     min-height: 300px;
+
+    /* allow inner .ai-response-content to scroll properly */
+    min-height: 0;
 }
 
 .ai-summary {
@@ -361,6 +376,9 @@ button#btn-search:disabled { background: #ccc; cursor: not-allowed; box-shadow: 
     overflow-y: auto;
     font-size: 1em;
     line-height: 1.6;
+
+    /* mobile/webkit smooth scrolling */
+    -webkit-overflow-scrolling: touch;
 }
 
 .route-theme { 
