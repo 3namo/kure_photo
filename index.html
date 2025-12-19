@@ -46,56 +46,50 @@
                 <i class="accordion-arrow fa-solid fa-chevron-down"></i>
             </summary>
             
-            <div class="settings-content" id="settings-content-main">
-                <div id="settings-left">
-                    <div class="control-group">
-                        <label>📍 現在地の指定方式</label>
-                        <div class="location-mode-toggle">
-                            <label class="toggle-label">
-                                <input type="checkbox" id="gps-mode-toggle" onchange="toggleLocationMode()">
-                                <span class="toggle-slider"></span>
-                                <span class="mode-text">GPS自動取得: <span id="mode-status">OFF (マップクリック)</span></span>
-                            </label>
-                        </div>
-                        <div class="hint" id="location-hint">※マップをクリックして現在地を指定してください</div>
+            <div class="settings-content">
+                <div class="control-group">
+                    <label>📍 現在地の指定方式</label>
+                    <div class="location-mode-toggle">
+                        <label class="toggle-label">
+                            <input type="checkbox" id="gps-mode-toggle" onchange="toggleLocationMode()">
+                            <span class="toggle-slider"></span>
+                            <span class="mode-text">GPS自動取得: <span id="mode-status">OFF (マップクリック)</span></span>
+                        </label>
                     </div>
+                    <div class="hint" id="location-hint">※マップをクリックして現在地を指定してください</div>
+                </div>
 
-                    <div class="control-group">
-                        <label>1. Gemini APIキー (必須)</label>
-                        <input type="password" id="gemini-key" placeholder="AI Studioで取得したキーを入力">
+                <div class="control-group">
+                    <label>1. Gemini APIキー (必須)</label>
+                    <input type="password" id="gemini-key" placeholder="AI Studioで取得したキーを入力">
+                </div>
+
+                <div class="control-group">
+                    <div class="accordion-header" onclick="toggleDatasetInput()">
+                        <label style="cursor:pointer; margin:0;">2. 呉市データセットID <small>(設定)</small></label>
+                        <i id="dataset-arrow" class="fa-solid fa-chevron-down"></i>
+                    </div>
+                    
+                    <div id="dataset-container" style="display:none; margin-top:10px;">
+                        <div class="hint">※カタログURL末尾のIDを入力</div>
+                        <input type="text" id="id-manhole" placeholder="デザインマンホール" value="design-manhole-list-1">
+                        <input type="text" id="id-culture" placeholder="文化財・歴史" value="cultural-property-list-1">
+                        <input type="text" id="id-shelter" placeholder="避難所(絶景用)" value="shelter-1">
                     </div>
                 </div>
-                
-                <div id="settings-divider"></div>
-                
-                <div id="settings-right">
-                    <div class="control-group">
-                        <div class="accordion-header" onclick="toggleDatasetInput()">
-                            <label style="cursor:pointer; margin:0;">2. 呉市データセットID <small>(設定)</small></label>
-                            <i id="dataset-arrow" class="fa-solid fa-chevron-down"></i>
-                        </div>
-                        
-                        <div id="dataset-container" style="display:none; margin-top:10px;">
-                            <div class="hint">※カタログURL末尾のIDを入力</div>
-                            <input type="text" id="id-manhole" placeholder="デザインマンホール" value="design-manhole-list-1">
-                            <input type="text" id="id-culture" placeholder="文化財・歴史" value="cultural-property-list-1">
-                            <input type="text" id="id-shelter" placeholder="避難所(絶景用)" value="shelter-1">
-                        </div>
-                    </div>
 
-                    <div class="control-group">
-                        <label>3. 今の気分・テーマ</label>
-                        <input type="text" id="user-mood" placeholder="例: 静かで落ち着ける場所、工場萌え">
-                    </div>
+                <div class="control-group">
+                    <label>3. 今の気分・テーマ</label>
+                    <input type="text" id="user-mood" placeholder="例: 静かで落ち着ける場所、工場萌え">
+                </div>
 
-                    <div class="control-group">
-                        <label>4. 所要時間 (分)</label>
-                        <input type="number" id="walk-duration" placeholder="例: 70" value="70">
-                        
-                        <label style="margin-top:10px;">5. ゴール地点 (任意)</label>
-                        <div class="hint">※空欄ならAIが良い場所を提案します</div>
-                        <input type="text" id="final-dest" placeholder="例: 呉駅、大和ミュージアム">
-                    </div>
+                <div class="control-group">
+                    <label>4. 所要時間 (分)</label>
+                    <input type="number" id="walk-duration" placeholder="例: 70" value="70">
+                    
+                    <label style="margin-top:10px;">5. ゴール地点 (任意)</label>
+                    <div class="hint">※空欄ならAIが良い場所を提案します</div>
+                    <input type="text" id="final-dest" placeholder="例: 呉駅、大和ミュージアム">
                 </div>
             </div>
         </details>

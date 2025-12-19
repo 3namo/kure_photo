@@ -74,45 +74,6 @@ function initResizer() {
             document.body.style.cursor = 'default';
         }
     });
-
-    // 設定パネル内のリサイザー
-    initSettingsPanelResizer();
-}
-
-function initSettingsPanelResizer() {
-    const divider = document.getElementById('settings-divider');
-    const contentMain = document.getElementById('settings-content-main');
-    const left = document.getElementById('settings-left');
-    const right = document.getElementById('settings-right');
-
-    let isSettingsResizing = false;
-
-    divider.addEventListener('mousedown', function(e) {
-        isSettingsResizing = true;
-        document.body.style.cursor = 'col-resize';
-        e.preventDefault();
-    });
-
-    document.addEventListener('mousemove', function(e) {
-        if (!isSettingsResizing) return;
-
-        const containerRect = contentMain.getBoundingClientRect();
-        const newLeftWidth = e.clientX - containerRect.left;
-        const minWidth = 80;
-        const maxWidth = containerRect.width - minWidth - 4; // 4はディバイダーの幅
-
-        if (newLeftWidth >= minWidth && newLeftWidth <= maxWidth) {
-            left.style.flex = '0 0 ' + newLeftWidth + 'px';
-            right.style.flex = '1';
-        }
-    });
-
-    document.addEventListener('mouseup', function(e) {
-        if (isSettingsResizing) {
-            isSettingsResizing = false;
-            document.body.style.cursor = 'default';
-        }
-    });
 }
 
 function saveSettings() {
