@@ -346,17 +346,29 @@ async function fetchKureData(endpointId, label) {
     const url = `https://api.expolis.cloud/opendata/t/kure/v1/${endpointId}`;
     try {
         // データプラットフォームくれ のアクセストークンは `ecp-api-token` ヘッダーを使用
-        const res = await fetch(url, { headers: { "ecp-api-token": KURE_API_KEY } });
-        if(!res.ok) throw new Error(`${res.status}`);
+        const defaultHeaders = { "ecp-api-token": KURE_API_KEY, "Accept": "application/json" };
+        let res = await fetch(url, { headers: defaultHeaders });
+        // 401 の場合はクエリパラメータ方式で再試行（環境によってはヘッダーが通らないことがあるため）
+        if (res.status === 401) {
+            log(`❗ 呉API: 401 Unauthorized（ヘッダー試行）。クエリパラメータで再試行します...`);
+            const urlWithToken = url + `?ecp-api-token=${encodeURIComponent(KURE_API_KEY)}`;
+            res = await fetch(urlWithToken, { headers: { "Accept": "application/json" } });
+        }
+        if (!res.ok) {
+            const txt = await res.text().catch(() => "(no body)");
+            throw new Error(`HTTP ${res.status} - ${res.statusText} | ${txt}`);
+        }
         const data = await res.json();
         let count = 0;
-        data.forEach(item => {
-            const iLat = item.latitude || item.lat;
-            const iLon = item.longitude || item.lon;
-            const iName = item.name || item.title || "名称不明";
-            if(iLat && iLon) {
+        // レスポンスは配列の場合とオブジェクト（data/items）を含む場合がある
+        const items = Array.isArray(data) ? data : (data.data || data.items || []);
+        items.forEach(item => {
+            const iLat = item.latitude || item.lat || item.latitude__ || null;
+            const iLon = item.longitude || item.lon || item.long || item.lng || null;
+            const iName = item.name || item.title || item.location_name || item.location || "名称不明";
+            if (iLat && iLon) {
                 const dist = Math.sqrt(Math.pow(currentLat - iLat, 2) + Math.pow(currentLon - iLon, 2));
-                if(dist < 0.02) { // 近場のみ
+                if (dist < 0.02) { // 近場のみ
                     addSpotToMap(iLat, iLon, label, iName, "KureOfficial", "bg-kure", "fa-star");
                     count++;
                 }
