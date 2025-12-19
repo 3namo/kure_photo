@@ -402,13 +402,28 @@ async function fetchKureData(endpointId, label) {
             return [null, null];
         }
 
+        // 種別に応じたアイコンと背景色を選択
+        let chosenBg = "bg-kure";
+        let chosenIcon = "fa-star";
+        const lbl = (label || endpointId || "").toString().toLowerCase();
+        if (lbl.includes('manhole') || lbl.includes('マンホール') || endpointId.includes('manhole')) {
+            chosenBg = 'bg-manhole';
+            chosenIcon = 'fa-circle-dot';
+        } else if (lbl.includes('shelter') || lbl.includes('避難所') || lbl.includes('高台') || endpointId.includes('shelter')) {
+            chosenBg = 'bg-infra';
+            chosenIcon = 'fa-house';
+        } else if (lbl.includes('culture') || lbl.includes('文化') || lbl.includes('cultural') || lbl.includes('retro') || lbl.includes('レトロ')) {
+            chosenBg = 'bg-retro';
+            chosenIcon = 'fa-landmark';
+        }
+
         items.forEach(item => {
             const [iLat, iLon] = extractLatLon(item);
             const iName = item.name || item.title || item.location_name || item.location || item.place || "名称不明";
             if (iLat && iLon) {
                 const dist = Math.sqrt(Math.pow(currentLat - iLat, 2) + Math.pow(currentLon - iLon, 2));
                 if (dist < 0.02) { // 近場のみ
-                    addSpotToMap(iLat, iLon, label, iName, "KureOfficial", "bg-kure", "fa-star");
+                    addSpotToMap(iLat, iLon, label, iName, "KureOfficial", chosenBg, chosenIcon);
                     count++;
                 }
             }
