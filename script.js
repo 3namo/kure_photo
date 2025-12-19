@@ -302,7 +302,41 @@ async function fetchOverpass(lat, lon) {
     const url = "https://overpass-api.de/api/interpreter?data=" + encodeURIComponent(query);
     try {
         const res = await fetch(url);
-        const data = await res.json();
+        const raw = await res.text();
+        let data;
+        const contentType = (res.headers.get('content-type') || '').toLowerCase();
+        // JSONでない（例: HTMLのエラーページ）が返る場合があるためガード
+        if (!res.ok) {
+            // まずは本文をログに含める
+            throw new Error(`${res.status} ${res.statusText}: ${raw.slice(0,200)}`);
+        }
+        if (contentType.includes('application/json') || raw.trim().startsWith('{') || raw.trim().startsWith('[')) {
+            data = JSON.parse(raw);
+        } else {
+            // フォールバックサーバーを順に試す
+            log('❗ OSM: OverpassがHTMLを返しました。フォールバックを試行します...');
+            const altServers = [
+                'https://lz4.overpass-api.de/api/interpreter?data=',
+                'https://overpass.openstreetmap.fr/api/interpreter?data=',
+                'https://overpass.kumi.systems/api/interpreter?data='
+            ];
+            let ok = false;
+            for (const s of altServers) {
+                try {
+                    const r2 = await fetch(s + encodeURIComponent(query));
+                    const txt2 = await r2.text();
+                    if (r2.ok && (txt2.trim().startsWith('{') || txt2.trim().startsWith('['))) {
+                        data = JSON.parse(txt2);
+                        ok = true; break;
+                    } else {
+                        log(`❗ Overpass fallback ${s} 状態=${r2.status}`);
+                    }
+                } catch(e) {
+                    log(`❌ Overpass fallback ${s} エラー: ${e.message}`);
+                }
+            }
+            if (!ok) throw new Error('Overpass: JSON応答取得失敗（フォールバック含む）');
+        }
         data.elements.forEach(el => {
             const tags = el.tags || {};
             const elLat = el.lat || (el.center && el.center.lat);
@@ -497,6 +531,21 @@ async function askAI() {
 
         // 3. レトロ
         if (mood.includes("レトロ") && (spot.type.includes("歴史") || spot.type === "マンホール" || spot.type.includes("文化"))) score += 100;
+
+        // 4. 避難所は通常は優先度を下げる（景色目的の高台は別途扱う）
+        if (spot.type && spot.type.includes("避難所")) {
+            if (mood.includes("避難") || mood.includes("避難所")) {
+                score += 50; // 明示的に避難所を求めている場合のみ軽い加点
+            } else {
+                score -= 200; // 通常は避ける
+            }
+        }
+
+        // 5. 高台 / 絶景は、ユーザーの要望に「景色」関連があると優先、なければ小さな加点
+        if (spot.type && (spot.type.includes("絶景") || spot.type.includes("水辺") || spot.type.includes("高台") || spot.type.includes("view"))) {
+            if (mood.includes("景") || mood.includes("絶景") || mood.includes("景色") || mood.includes("view")) score += 150;
+            else score += 30;
+        }
 
         return { ...spot, score: score + Math.random() * 10 }; // ランダム性も加味
     });
