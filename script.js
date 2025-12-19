@@ -524,6 +524,8 @@ async function askAI() {
     const duration = Number(document.getElementById('walk-duration').value) || 60;
     // drawSmartRoute で参照するためグローバルに格納
     window.requestedDuration = duration;
+    // ユーザーの要望（ムード）をグローバルに保持（後続のルート調整で参照）
+    window.userMood = mood;
     const destination = document.getElementById('final-dest').value || "AIにお任せ(最適な場所)";
     
     if(!geminiKey) { alert("Gemini APIキーを入力してください"); return; }
@@ -636,6 +638,83 @@ async function drawSmartRoute(routePoints) {
         return await res.json();
     }
 
+    // ルートが所要時間の下限より短い場合、候補スポットを追加して延伸を試みる
+    async function tryExpandRouteToMinMinutes(pts, minAllowed, requested) {
+        // 候補は gatheredSpots の中からまだ使われていないスポット
+        const used = new Set(pts.map(p => (p.name || p.lat + ',' + p.lon)));
+        let candidates = gatheredSpots.filter(s => !used.has(s.name));
+        if (!candidates || candidates.length === 0) return { pts, data: null, walkMinutes: 0, distMeters: 0 };
+
+        // 優先ルール: ユーザーが「川」や「水」を希望している場合は水辺を優先
+        const mood = (window.userMood || '').toString();
+        candidates.sort((a, b) => {
+            const aWater = (a.type || '').includes('水') ? 0 : 1;
+            const bWater = (b.type || '').includes('水') ? 0 : 1;
+            if (mood.includes('川') || mood.includes('水') || mood.includes('海')) {
+                if (aWater !== bWater) return aWater - bWater; // 水辺優先
+            }
+            // 共通: 終点（最後のpt）からの距離が近い順
+            const last = pts[pts.length - 1];
+            const da = Math.hypot(last.lat - a.lat, last.lon - a.lon);
+            const db = Math.hypot(last.lat - b.lat, last.lon - b.lon);
+            return da - db;
+        });
+
+        let added = 0;
+        let localData = null;
+        let localDist = 0;
+        let localMinutes = 0;
+
+        // 最大追加数を制限（無限ループ防止）
+        const MAX_ADDITIONS = 6;
+        for (const cand of candidates) {
+            if (added >= MAX_ADDITIONS) break;
+            // 最終地点の直前に挿入して経路を延ばす
+            const insertPos = Math.max(1, pts.length - 1);
+            const newPt = { name: cand.name || '追加スポット', lat: cand.lat, lon: cand.lon, photo_tip: '' };
+            pts.splice(insertPos, 0, newPt);
+            localData = await getOsrmForPoints(pts);
+            if (localData && localData.routes && localData.routes.length > 0) {
+                localDist = localData.routes[0].distance;
+                localMinutes = Math.round((localDist / 1000) / 4.0 * 60);
+            } else {
+                localDist = 0; localMinutes = 0;
+            }
+            added++;
+            log(`➕ 追加スポット: ${newPt.name} を挿入。所要 ${localMinutes}分`);
+            if (localMinutes >= minAllowed) {
+                log(`✅ 追加により下限 ${minAllowed}分 を満たしました。`);
+                return { pts, data: localData, walkMinutes: localMinutes, distMeters: localDist };
+            }
+        }
+
+        // まだ短い場合、ルート間に中点を挿入して微妙な迂回を作る（最大4点）
+        if (localMinutes < minAllowed) {
+            const maxMidpoints = 4;
+            let midsAdded = 0;
+            for (let i = 0; i < pts.length - 1 && midsAdded < maxMidpoints; i++) {
+                const a = pts[i]; const b = pts[i+1];
+                const mid = { name: 'ちょっと寄り道', lat: (a.lat + b.lat)/2, lon: (a.lon + b.lon)/2, photo_tip: '' };
+                pts.splice(i+1, 0, mid);
+                localData = await getOsrmForPoints(pts);
+                if (localData && localData.routes && localData.routes.length > 0) {
+                    localDist = localData.routes[0].distance;
+                    localMinutes = Math.round((localDist / 1000) / 4.0 * 60);
+                } else { localDist = 0; localMinutes = 0; }
+                midsAdded++;
+                log(`🔁 中間点挿入で所要 ${localMinutes}分`);
+                if (localMinutes >= minAllowed) {
+                    log(`✅ 中間点で下限を満たしました。`);
+                    return { pts, data: localData, walkMinutes: localMinutes, distMeters: localDist };
+                }
+                // ループ継続でさらに中点を追加
+            }
+        }
+
+        // ここまで来ても満たさなければ現在の状態を返す
+        return { pts, data: localData, walkMinutes: localMinutes, distMeters: localDist };
+    }
+
     try {
         let pts = routePoints.slice();
         let data = await getOsrmForPoints(pts);
@@ -693,7 +772,18 @@ async function drawSmartRoute(routePoints) {
         }
         // 範囲下限より短すぎる場合は注意表示
         if (requested && minAllowed !== null && walkMinutes < minAllowed) {
-            log(`⚠️ ルート所要時間 ${walkMinutes}分 は希望下限 ${minAllowed}分 より短いです。追加スポットを検討してください。`);
+            log(`⚠️ ルート所要時間 ${walkMinutes}分 は希望下限 ${minAllowed}分 より短いです。自動でスポットを追加して延伸を試みます...`);
+            const expanded = await tryExpandRouteToMinMinutes(pts, minAllowed, requested);
+            if (expanded && expanded.walkMinutes >= minAllowed) {
+                // 成功した場合、expanded.pts を使って再描画
+                pts = expanded.pts;
+                data = expanded.data || data;
+                walkMinutes = expanded.walkMinutes;
+                distMeters = expanded.distMeters;
+                log(`✅ 自動延伸結果: ${walkMinutes}分`);
+            } else {
+                log(`⚠️ 自動延伸でも下限に達しませんでした（${expanded.walkMinutes || walkMinutes}分）。`);
+            }
         }
     } catch (e) {
         log("⚠️ 道案内取得失敗。直線で結びます。");
