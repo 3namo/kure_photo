@@ -545,40 +545,6 @@ function categorizeSport(spotType) {
     return 'その他';
 }
 
-    try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL_NAME}:generateContent?key=${geminiKey}`;
-        const res = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-        });
-        
-        const result = await res.json();
-        if (result.error) throw new Error(`Google API Error: ${result.error.message}`);
-        if (!result.candidates || result.candidates.length === 0) throw new Error("AIからの回答が空でした");
-
-        let text = result.candidates[0].content.parts[0].text;
-        text = text.replace(/^```json\s*/, "").replace(/\s*```$/, "");
-
-        const routeData = JSON.parse(text);
-        window.lastRouteData = routeData;
-
-        log("🗺️ ルートデータを受信。ナビゲーション取得中...");
-        
-        // 念のためここでも開く
-        if(detailsElement) detailsElement.open = true;
-
-        await drawSmartRoute(routeData.route);
-
-    } catch(e) {
-        console.error(e);
-        // エラー時も見せる
-        if(detailsElement) detailsElement.open = true;
-        responseArea.innerHTML = `<div style="color:red; font-weight:bold;">ルート生成エラー</div><small>${e.message}</small>`;
-        log(`❌ エラー: ${e.message}`);
-    }
-}
-
 async function drawSmartRoute(routePoints) {
     if(!routePoints || routePoints.length === 0) return;
 
