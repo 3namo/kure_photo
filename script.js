@@ -14,7 +14,9 @@ let routeLayer = L.layerGroup();
 let currentLat, currentLon;
 let gatheredSpots = [];
 let weatherDescription = "";
-let forecastText = ""; 
+let forecastText = "";
+let gpsMode = false;
+let currentLocationMarker = null; 
 
 window.onload = function() {
     loadSettings();
@@ -26,8 +28,16 @@ window.onload = function() {
     markersLayer.addTo(map);
     routeLayer.addTo(map);
 
+    // 初期状態はGPS OFFに設定
+    document.getElementById('gps-mode-toggle').checked = false;
+    gpsMode = false;
+    updateLocationHint();
+
+    // マップクリックイベント（GPS OFFの時のみ有効）
     map.on('click', async function(e) {
-        await startExploration(e.latlng.lat, e.latlng.lng);
+        if (!gpsMode) {
+            await startExploration(e.latlng.lat, e.latlng.lng);
+        }
     });
 
     const inputs = document.querySelectorAll('input');
@@ -65,6 +75,80 @@ function loadSettings() {
 
 function toggleSidebar() {
     document.getElementById('sidebar').classList.toggle('closed');
+}
+
+function toggleLocationMode() {
+    gpsMode = document.getElementById('gps-mode-toggle').checked;
+    updateLocationHint();
+    
+    if (gpsMode) {
+        getCurrentLocation();
+    }
+}
+
+function updateLocationHint() {
+    const hintEl = document.getElementById('location-hint');
+    const statusEl = document.getElementById('mode-status');
+    if (gpsMode) {
+        statusEl.textContent = 'ON (GPS取得中)';
+        hintEl.textContent = '※位置情報を使用して現在地を取得します';
+    } else {
+        statusEl.textContent = 'OFF (マップクリック)';
+        hintEl.textContent = '※マップをクリックして現在地を指定してください';
+    }
+}
+
+function getCurrentLocation() {
+    log('📍 GPS位置情報を取得中...');
+    if (!navigator.geolocation) {
+        log('❌ ブラウザが位置情報取得に対応していません');
+        gpsMode = false;
+        document.getElementById('gps-mode-toggle').checked = false;
+        updateLocationHint();
+        return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+        function(position) {
+            const lat = position.coords.latitude;
+            const lon = position.coords.longitude;
+            const accuracy = position.coords.accuracy;
+            log(`✅ GPS取得成功: ${lat.toFixed(4)}, ${lon.toFixed(4)} (精度: ${Math.round(accuracy)}m)`);
+            
+            // 地図を現在地に移動
+            map.setView([lat, lon], 16);
+            
+            // 現在地マーカーを表示
+            if (currentLocationMarker) {
+                markersLayer.removeLayer(currentLocationMarker);
+            }
+            const icon = L.divIcon({
+                className: '',
+                html: `<div style="width:28px; height:28px; background:#007bff; border-radius:50%; border:3px solid white; box-shadow:0 0 10px rgba(0,123,255,0.5);"></div>`,
+                iconSize: [28, 28],
+                iconAnchor: [14, 14],
+                popupAnchor: [0, -14]
+            });
+            currentLocationMarker = L.marker([lat, lon], {icon: icon})
+                .bindPopup("現在地（GPS取得）")
+                .addTo(markersLayer)
+                .openPopup();
+        },
+        function(error) {
+            let errorMsg = '位置情報の取得に失敗しました';
+            if (error.code === error.PERMISSION_DENIED) {
+                errorMsg = '位置情報へのアクセスが許可されていません';
+            } else if (error.code === error.POSITION_UNAVAILABLE) {
+                errorMsg = '位置情報が利用できません';
+            } else if (error.code === error.TIMEOUT) {
+                errorMsg = '位置情報の取得がタイムアウトしました';
+            }
+            log(`❌ GPS取得エラー: ${errorMsg}`);
+            gpsMode = false;
+            document.getElementById('gps-mode-toggle').checked = false;
+            updateLocationHint();
+        }
+    );
 }
 
 function toggleDatasetInput() {
@@ -109,10 +193,17 @@ function log(msg) {
 async function startExploration(lat, lon) {
     currentLat = lat; currentLon = lon;
     gatheredSpots = [];
-    markersLayer.clearLayers();
+    if (!gpsMode) {
+        markersLayer.clearLayers();
+    }
     routeLayer.clearLayers();
     
-    L.marker([lat, lon]).addTo(markersLayer).bindPopup("現在地").openPopup();
+    // GPS モード時は既にマーカーがあるので追加しない
+    if (!gpsMode) {
+        L.marker([lat, lon]).addTo(markersLayer).bindPopup("現在地").openPopup();
+    } else if (currentLocationMarker) {
+        currentLocationMarker.openPopup();
+    }
     
     document.getElementById('btn-search').disabled = true;
     document.getElementById('ai-response').innerHTML = "データ収集中...";

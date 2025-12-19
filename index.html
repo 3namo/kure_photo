@@ -40,6 +40,18 @@
         </div>
         
         <div class="control-group">
+            <label>📍 現在地の指定方式</label>
+            <div class="location-mode-toggle">
+                <label class="toggle-label">
+                    <input type="checkbox" id="gps-mode-toggle" onchange="toggleLocationMode()">
+                    <span class="toggle-slider"></span>
+                    <span class="mode-text">GPS自動取得: <span id="mode-status">OFF (マップクリック)</span></span>
+                </label>
+            </div>
+            <div class="hint" id="location-hint">※マップをクリックして現在地を指定してください</div>
+        </div>
+
+        <div class="control-group">
             <label>1. Gemini APIキー (必須)</label>
             <input type="password" id="gemini-key" placeholder="AI Studioで取得したキーを入力">
         </div>
