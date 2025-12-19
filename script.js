@@ -16,7 +16,8 @@ let gatheredSpots = [];
 let weatherDescription = "";
 let forecastText = "";
 let gpsMode = false;
-let currentLocationMarker = null; 
+let currentLocationMarker = null;
+let isResizing = false;
 
 window.onload = function() {
     loadSettings();
@@ -44,7 +45,36 @@ window.onload = function() {
     inputs.forEach(input => {
         input.addEventListener('input', saveSettings);
     });
+
+    // リサイザーの初期化
+    initResizer();
 };
+
+function initResizer() {
+    const resizer = document.getElementById('resizer');
+    const sidebar = document.getElementById('sidebar');
+
+    resizer.addEventListener('mousedown', function(e) {
+        isResizing = true;
+        document.body.style.cursor = 'col-resize';
+    });
+
+    document.addEventListener('mousemove', function(e) {
+        if (!isResizing) return;
+        
+        // サイドバーの新しい幅を計算（最小200px、最大800px）
+        const newWidth = Math.max(200, Math.min(800, e.clientX));
+        sidebar.style.width = newWidth + 'px';
+        map.invalidateSize();
+    });
+
+    document.addEventListener('mouseup', function(e) {
+        if (isResizing) {
+            isResizing = false;
+            document.body.style.cursor = 'default';
+        }
+    });
+}
 
 function saveSettings() {
     const settings = {

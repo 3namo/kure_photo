@@ -37,7 +37,7 @@ body {
     flex-direction: column;
     position: relative; 
     flex-shrink: 0;
-    transition: transform 0.3s ease;
+    transition: none;
 }
 
 /* --- スクロールバーのデザイン強化 (Chrome, Safari, Edge) --- */
@@ -56,6 +56,22 @@ body {
 }
 #sidebar::-webkit-scrollbar-thumb:hover {
     background-color: #999; 
+}
+
+/* ===== リサイザーバー ===== */
+#resizer {
+    width: 6px;
+    height: 100vh;
+    background-color: #999;
+    cursor: col-resize;
+    user-select: none;
+    z-index: 2001;
+    flex-shrink: 0;
+    transition: background-color 0.2s;
+}
+
+#resizer:hover {
+    background-color: #007bff;
 }
 
 /* サイドバーを閉じた時のスタイル */
