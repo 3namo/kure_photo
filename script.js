@@ -345,7 +345,8 @@ async function fetchKureData(endpointId, label) {
     log(`⚓️ 呉データ(${label})取得中...`);
     const url = `https://api.expolis.cloud/opendata/t/kure/v1/${endpointId}`;
     try {
-        const res = await fetch(url, { headers: { "Authorization": `Bearer ${KURE_API_KEY}` } });
+        // データプラットフォームくれ のアクセストークンは `ecp-api-token` ヘッダーを使用
+        const res = await fetch(url, { headers: { "ecp-api-token": KURE_API_KEY } });
         if(!res.ok) throw new Error(`${res.status}`);
         const data = await res.json();
         let count = 0;
@@ -396,7 +397,9 @@ function addSpotToMap(lat, lon, type, name, source, bgClass, iconClass="fa-map-p
 async function askAI() {
     const geminiKey = document.getElementById('gemini-key').value;
     const mood = document.getElementById('user-mood').value;
-    const duration = document.getElementById('walk-duration').value || 60;
+    const duration = Number(document.getElementById('walk-duration').value) || 60;
+    // drawSmartRoute で参照するためグローバルに格納
+    window.requestedDuration = duration;
     const destination = document.getElementById('final-dest').value || "AIにお任せ(最適な場所)";
     
     if(!geminiKey) { alert("Gemini APIキーを入力してください"); return; }
@@ -481,22 +484,58 @@ ${JSON.stringify(spotsListJson)}
 async function drawSmartRoute(routePoints) {
     if(!routePoints || routePoints.length === 0) return;
 
-    const waypoints = [[currentLon, currentLat], ...routePoints.map(p => [p.lon, p.lat])];
-    const coordsString = waypoints.map(pt => pt.join(',')).join(';');
-    const osrmUrl = `https://router.project-osrm.org/route/v1/walking/${coordsString}?overview=full&geometries=geojson`;
+    // ルートの長さを取得して、ユーザー指定の所要時間レンジに収まるように
+    // 必要なら末尾のスポットを順に削る（短くする）試行を行う
+    const requested = (window.requestedDuration !== undefined) ? Number(window.requestedDuration) : null;
+    const minAllowed = requested ? Math.max(0, requested - 10) : null;
+
+    async function getOsrmForPoints(points) {
+        const waypoints = [[currentLon, currentLat], ...points.map(p => [p.lon, p.lat])];
+        const coordsString = waypoints.map(pt => pt.join(',')).join(';');
+        const osrmUrl = `https://router.project-osrm.org/route/v1/walking/${coordsString}?overview=full&geometries=geojson`;
+        const res = await fetch(osrmUrl);
+        return await res.json();
+    }
 
     try {
-        const res = await fetch(osrmUrl);
-        const data = await res.json();
+        let pts = routePoints.slice();
+        let data = await getOsrmForPoints(pts);
         let distMeters = 0;
         let walkMinutes = 0;
 
         if (data.routes && data.routes.length > 0) {
+            distMeters = data.routes[0].distance;
+            walkMinutes = Math.round((distMeters / 1000) / 4.0 * 60);
+        }
+
+        // 希望時間が指定されている場合、上限を越えるなら末尾を順に削って調整
+        if (requested && walkMinutes > requested) {
+            log(`⏱ ルート ${walkMinutes}分 は希望 ${requested}分 を超えています。短縮を試行します...`);
+            // 最低でもスタート→1スポットは残す
+            while (pts.length > 1) {
+                pts.pop();
+                data = await getOsrmForPoints(pts);
+                if (data.routes && data.routes.length > 0) {
+                    distMeters = data.routes[0].distance;
+                    walkMinutes = Math.round((distMeters / 1000) / 4.0 * 60);
+                } else {
+                    walkMinutes = 0; distMeters = 0;
+                }
+                if (walkMinutes <= requested) break;
+            }
+
+            if (walkMinutes > requested) {
+                log(`⚠️ 短縮により ${walkMinutes}分 のままでした。さらに調整できませんでした。`);
+            } else {
+                log(`✅ 短縮成功: ${walkMinutes}分 に収まりました。`);
+                routePoints = pts; // 描画対象を更新
+            }
+        }
+
+        // 描画（OSRMデータがある場合はジオメトリを使う）
+        if (data.routes && data.routes.length > 0 && data.routes[0].geometry) {
             const route = data.routes[0];
             const coordinates = route.geometry.coordinates;
-            distMeters = route.distance;
-            walkMinutes = Math.round((distMeters / 1000) / 4.0 * 60);
-
             const hotlineData = coordinates.map((c, index) => [c[1], c[0], index / (coordinates.length - 1)]);
             const hotline = L.hotline(hotlineData, {
                 weight: 6, outlineWidth: 1, outlineColor: 'white',
@@ -512,6 +551,10 @@ async function drawSmartRoute(routePoints) {
         } else {
             addRouteMarkers(routePoints);
             renderRouteSidebar({ ...window.lastRouteData, distance: 0, walkMinutes: 0 });
+        }
+        // 範囲下限より短すぎる場合は注意表示
+        if (requested && minAllowed !== null && walkMinutes < minAllowed) {
+            log(`⚠️ ルート所要時間 ${walkMinutes}分 は希望下限 ${minAllowed}分 より短いです。追加スポットを検討してください。`);
         }
     } catch (e) {
         log("⚠️ 道案内取得失敗。直線で結びます。");
