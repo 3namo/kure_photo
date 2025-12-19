@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>呉市お散歩マップ</title>
+    <title>呉市お散歩アプリ (Full Ver.)</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -21,7 +21,7 @@
 
     <div id="sidebar">
         <div class="sidebar-header">
-            <h2>📡 呉市お散歩マップ</h2>
+            <h2>📡 Kure-AI Explorer</h2>
             <button id="close-sidebar" onclick="toggleSidebar()" class="mobile-only">
                 <i class="fa-solid fa-times"></i>
             </button>
@@ -39,10 +39,9 @@
             <div id="forecast-container"></div>
         </div>
         
-        <!-- 設定パネル（開閉可能） -->
         <details class="settings-accordion" open>
             <summary class="settings-summary">
-                <i class="fa-solid fa-sliders"></i> 設定パネル
+                <span><i class="fa-solid fa-sliders"></i> 設定パネル</span>
                 <i class="accordion-arrow fa-solid fa-chevron-down"></i>
             </summary>
             
@@ -80,7 +79,8 @@
 
                 <div class="control-group">
                     <label>3. 今の気分・テーマ</label>
-                    <input type="text" id="user-mood" placeholder="例: 静かで落ち着ける場所、工場萌え">
+                    <input type="text" id="user-mood" placeholder="例: 神社に行きたい、川沿いを歩きたい">
+                    <div class="hint">※「神社」「海」など具体的に書くとAIが優先します</div>
                 </div>
 
                 <div class="control-group">
@@ -96,19 +96,17 @@
 
         <button id="btn-search" onclick="askAI()" disabled>AIにプランを聞く</button>
         
-        <!-- ログパネル（開閉可能） -->
         <details class="settings-accordion">
             <summary class="settings-summary">
-                <i class="fa-solid fa-terminal"></i> システムログ
+                <span><i class="fa-solid fa-terminal"></i> システムログ</span>
                 <i class="accordion-arrow fa-solid fa-chevron-down"></i>
             </summary>
             <div id="log-area" class="settings-content">システムログ: 待機中...</div>
         </details>
         
-        <!-- AI結果パネル（重要 - 常に表示） -->
         <details id="ai-result-details" class="ai-accordion" open>
             <summary class="ai-summary">
-                <i class="fa-solid fa-map"></i> 🤖 AIプラン結果
+                <span><i class="fa-solid fa-map"></i> 🤖 AIプラン結果</span>
                 <i class="accordion-arrow fa-solid fa-chevron-up"></i>
             </summary>
             <div id="ai-response" class="ai-response-content">地図をクリックすると探索を開始します。</div>
@@ -116,7 +114,6 @@
     </div>
 
     <div id="resizer"></div>
-
     <div id="map"></div>
 
     <script src="script.js"></script>

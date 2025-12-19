@@ -398,8 +398,8 @@ button#btn-search:disabled { background: #ccc; cursor: not-allowed; box-shadow: 
 /* ピンの色設定（展開して記述） */
 .bg-steps   { background: #00BFFF; }
 .bg-path    { background: #87CEEB; }
-.bg-shrine  { background: #FF4500; }
-.bg-temple  { background: #800080; }
+.bg-shrine  { background: #FF4500; } /* 神社＝朱色 */
+.bg-temple  { background: #800080; } /* 寺院＝紫 */
 .bg-view    { background: #32CD32; }
 .bg-infra   { background: #708090; }
 .bg-retro   { background: #8B4513; }
@@ -407,6 +407,10 @@ button#btn-search:disabled { background: #ccc; cursor: not-allowed; box-shadow: 
 .bg-vending { background: #0000FF; }
 .bg-manhole { background: #A9A9A9; }
 .bg-kure    { background: #FF00FF; border: 2px solid yellow; }
+
+/* ★以下、AI精度向上のために追加した新しいクラス */
+.bg-water   { background: #1E90FF; } /* 川・海用 */
+.bg-other   { background: #708090; } /* その他用 */
 
 /* =========================================
    レスポンシブ設定
