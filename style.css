@@ -395,6 +395,8 @@ button#btn-search:disabled { background: #ccc; cursor: not-allowed; box-shadow: 
     border: 2px solid white; font-size: 14px;
 }
 
+.custom-icon.bg-temple { font-size: 18px; font-weight: bold; }
+
 /* ピンの色設定（展開して記述） */
 .bg-steps   { background: #00BFFF; }
 .bg-path    { background: #87CEEB; }

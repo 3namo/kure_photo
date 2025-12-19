@@ -270,39 +270,52 @@ async function fetchWeather(lat, lon) {
 // ★修正版: Overpass API (神社/寺/川を厳格に区別)
 async function fetchOverpass(lat, lon) {
     log("🌍 OSMデータ検索中(区別強化版)...");
-    const query = `
-        [out:json][timeout:30];
-        (
-          node["amenity"="place_of_worship"](around:1200,${lat},${lon});
-          way["amenity"="place_of_worship"](around:1200,${lat},${lon});
-          node["man_made"="torii"](around:1200,${lat},${lon});
-          node["tourism"="viewpoint"](around:1200,${lat},${lon});
-          node["historic"](around:1200,${lat},${lon});
-          node["waterway"~"waterfall"](around:1200,${lat},${lon});
-          relation["waterway"="river"](around:1200,${lat},${lon}); 
-          way["natural"="coastline"](around:1200,${lat},${lon});
-          way["highway"="steps"](around:800,${lat},${lon});
-          way["highway"="path"](around:800,${lat},${lon});
-          node["amenity"="vending_machine"](around:800,${lat},${lon});
-        );
-        out center;
-    `;
+        const query = `
+                [out:json][timeout:30];
+                (
+                    // 神社・寺院などの礼拝施設
+                    node["amenity"="place_of_worship"](around:1600,${lat},${lon});
+                    way["amenity"="place_of_worship"](around:1600,${lat},${lon});
+                    node["religion"="buddhist"](around:1600,${lat},${lon});
+                    way["religion"="buddhist"](around:1600,${lat},${lon});
+
+                    // 鳥居や神社に関連する要素
+                    node["man_made"="torii"](around:1600,${lat},${lon});
+                    way["man_made"="torii"](around:1600,${lat},${lon});
+
+                    // ビューポイント・史跡・滝・河川・海岸
+                    node["tourism"="viewpoint"](around:1600,${lat},${lon});
+                    node["historic"](around:1600,${lat},${lon});
+                    node["waterway"~"waterfall"](around:1600,${lat},${lon});
+                    relation["waterway"="river"](around:1600,${lat},${lon});
+                    way["natural"="coastline"](around:1600,${lat},${lon});
+
+                    // 階段・小道・自販機などのインフラ
+                    way["highway"="steps"](around:1000,${lat},${lon});
+                    way["highway"="path"](around:1000,${lat},${lon});
+                    node["amenity"="vending_machine"](around:1000,${lat},${lon});
+
+                    // その他、表示したいタグがあれば追加
+                );
+                out center;
+        `;
     const url = "https://overpass-api.de/api/interpreter?data=" + encodeURIComponent(query);
     try {
         const res = await fetch(url);
         const data = await res.json();
         data.elements.forEach(el => {
             const tags = el.tags || {};
-            const lat = el.lat || el.center.lat;
-            const lon = el.lon || el.center.lon;
-            
-            let type="その他", bg="bg-other", icon="fa-map-pin";
+            const elLat = el.lat || (el.center && el.center.lat);
+            const elLon = el.lon || (el.center && el.center.lon);
+            if (!elLat || !elLon) return;
 
-            // ★ジャンル分けロジック
-            if (tags.religion === "shinto" || tags.man_made === "torii") {
+            let type = "その他", bg = "bg-other", icon = "fa-map-pin";
+
+            // ジャンル分けロジック（優先順位を明確に）
+            if (tags.religion === "buddhist") {
+                type = "寺院"; bg = "bg-temple"; icon = null; // 卍で表示
+            } else if (tags.religion === "shinto" || tags.man_made === "torii" || tags.man_made === "tori") {
                 type = "神社"; bg = "bg-shrine"; icon = "fa-torii-gate";
-            } else if (tags.religion === "buddhist") {
-                type = "寺院"; bg = "bg-temple"; icon = "fa-om-symbol";
             } else if (tags.tourism === "viewpoint") {
                 type = "絶景"; bg = "bg-view"; icon = "fa-camera";
             } else if (tags.historic) {
@@ -316,12 +329,12 @@ async function fetchOverpass(lat, lon) {
             } else if (tags.amenity === "vending_machine") {
                 type = "自販機"; bg = "bg-vending"; icon = "fa-bottle-water";
             }
-            
-            // 名前がないものは重要度が低いのでスキップ（階段などは例外）
+
+            // 名前がないものは重要度が低いのでスキップ（階段・自販機などは例外）
             const name = tags.name || tags.alt_name || "";
             if (!name && tags.highway !== "steps" && tags.amenity !== "vending_machine") return;
 
-            addSpotToMap(lat, lon, type, name || type, "OSM", bg, icon);
+            addSpotToMap(elLat, elLon, type, name || type, "OSM", bg, icon);
         });
         log(`🌍 OSM: ${data.elements.length}件`);
     } catch(e) { log(`❌ OSMエラー: ${e.message}`); }
@@ -357,9 +370,19 @@ function addSpotToMap(lat, lon, type, name, source, bgClass, iconClass="fa-map-p
     if(gatheredSpots.some(s => s.name === name && Math.abs(s.lat - lat) < 0.0001)) return;
 
     gatheredSpots.push({ lat, lon, type, name, source });
+    // 寺院は卍で表示したい（視認性のため、アイコンは文字で表示）
+    let html = '';
+    if (bgClass === 'bg-temple') {
+        html = `<div class="custom-icon ${bgClass}" style="width:24px; height:24px; font-size:18px; line-height:22px;">卍</div>`;
+    } else if (iconClass) {
+        html = `<div class="custom-icon ${bgClass}" style="width:24px; height:24px;"><i class="fa-solid ${iconClass}"></i></div>`;
+    } else {
+        html = `<div class="custom-icon ${bgClass}" style="width:24px; height:24px;"></div>`;
+    }
+
     const icon = L.divIcon({
         className: '',
-        html: `<div class="custom-icon ${bgClass}" style="width:24px; height:24px;"><i class="fa-solid ${iconClass}"></i></div>`,
+        html: html,
         iconSize: [24, 24], iconAnchor: [12, 12], popupAnchor: [0, -12]
     });
     L.marker([lat, lon], {icon: icon})
