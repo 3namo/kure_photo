@@ -373,6 +373,7 @@ async function askAI() {
     if(!geminiKey) { alert("Gemini APIキーを入力してください"); return; }
     if(gatheredSpots.length === 0) { alert("周辺にスポットがありません"); return; }
 
+    // ★改善箇所: ボタンを押したら強制的にアコーディオンを開く
     const detailsElement = document.getElementById('ai-result-details');
     if(detailsElement) detailsElement.open = true;
 
@@ -387,23 +388,17 @@ async function askAI() {
 
     const prompt = `
 あなたは呉市のフォトスポットガイドです。
-以下のデータから、ユーザーの希望に最も合致した散歩ルートを1つ作成してください。
+以下のデータから、最も写真映えする散歩ルートを1つ作成してください。
 
-【ユーザーの希望】
-- 気分・テーマ: "${mood}"
-- 所要時間: ${duration}分（移動と撮影を含めて最大限活用してください）
-- ゴール地点: "${destination}"
-- 現在の天気: ${weatherDescription}
+【条件】
+- 現在地からスタートすること。
+- 所要時間: ${duration}分を目安にしてください。移動と撮影を含めて、この時間を**最大限活用する**充実したルートにしてください。短時間で終わるルートはNGです。
+- ゴール地点: "${destination}" にすること。
+- 天気(${weatherDescription}, 予報:${forecastText})と気分(${mood})を考慮すること。
+- 長文の説明は不要。
 
-【重要な指示】
-1. テーマの一貫性を最優先にしてください。例えば「神社に行きたい」と言っているのに寺を選ばないでください。
-2. ユーザーが具体的に「川沿い」「階段」などと言っている場合は、その要素を含むスポットを優先してください。
-3. スポット間の効率的なルートを作成し、${duration}分を最大限に活用してください。
-4. 同じカテゴリー（例：神社と寺）の混在を避けてください。
-5. 指定されたゴール地点が"AIにお任せ(最適な場所)"でない場合は、そこにたどり着くルートにしてください。
-
-【JSONフォーマット】
-回答は必ず以下のフォーマットのみで行うこと。Markdownのコードブロックは不要：
+【重要指令】
+回答は必ず以下のJSONフォーマットのみで行うこと。Markdownのコードブロックは不要。
 
 {
   "theme": "ルートの短いキャッチコピー",
@@ -422,7 +417,7 @@ async function askAI() {
   ]
 }
 
-【スポット候補（type=スポット種別）】
+【周辺スポット候補データ】
 ${JSON.stringify(spotsListJson)}
 `;
 
@@ -446,12 +441,14 @@ ${JSON.stringify(spotsListJson)}
 
         log("🗺️ ルートデータを受信。ナビゲーション取得中...");
         
+        // 念のためここでも開く
         if(detailsElement) detailsElement.open = true;
 
         await drawSmartRoute(routeData.route);
 
     } catch(e) {
         console.error(e);
+        // エラー時も見せる
         if(detailsElement) detailsElement.open = true;
         responseArea.innerHTML = `<div style="color:red; font-weight:bold;">ルート生成エラー</div><small>${e.message}</small>`;
         log(`❌ エラー: ${e.message}`);
