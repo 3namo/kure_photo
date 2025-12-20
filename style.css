@@ -41,6 +41,7 @@ body {
 
     /* allow flex children with overflow to shrink/scroll correctly */
     min-height: 0;
+    -webkit-overflow-scrolling: touch;
 }
 
 /* --- スクロールバーのデザイン強化 (Chrome, Safari, Edge) --- */
@@ -379,6 +380,7 @@ button#btn-search:disabled { background: #ccc; cursor: not-allowed; box-shadow: 
 
     /* mobile/webkit smooth scrolling */
     -webkit-overflow-scrolling: touch;
+    max-height: calc(100vh - 260px);
 }
 
 .route-theme { 

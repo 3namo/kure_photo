@@ -645,71 +645,85 @@ async function drawSmartRoute(routePoints) {
         let candidates = gatheredSpots.filter(s => !used.has(s.name));
         if (!candidates || candidates.length === 0) return { pts, data: null, walkMinutes: 0, distMeters: 0 };
 
-        // ヘルパ: 距離計算 (おおまかなメートル換算、ハバースインは過剰なので簡易版で十分)
+        // ヘルパ: 距離計算 (正確さは必要ないので簡易ハバースイン)
         function approxMeters(aLat, aLon, bLat, bLon) {
-            const R = 6371000; // earth radius m
-            const toRad = Math.PI / 180;
-            const dLat = (bLat - aLat) * toRad;
-            const dLon = (bLon - aLon) * toRad;
-            const lat1 = aLat * toRad;
-            const lat2 = bLat * toRad;
-            const sinDLat = Math.sin(dLat/2);
-            const sinDLon = Math.sin(dLon/2);
+            const R = 6371000; const toRad = Math.PI / 180;
+            const dLat = (bLat - aLat) * toRad; const dLon = (bLon - aLon) * toRad;
+            const lat1 = aLat * toRad; const lat2 = bLat * toRad;
+            const sinDLat = Math.sin(dLat/2); const sinDLon = Math.sin(dLon/2);
             const A = sinDLat*sinDLat + Math.cos(lat1)*Math.cos(lat2)*sinDLon*sinDLon;
             const C = 2 * Math.atan2(Math.sqrt(A), Math.sqrt(1-A));
             return R * C;
         }
 
-        // 最終点とゴール(最後のポイント)を取得
-        const startPt = pts[0];
-        const goalPt = pts[pts.length - 1];
+        // 現在のルート長と所要時間を取得
+        let baseData = await getOsrmForPoints(pts);
+        let baseDist = 0; let baseMinutes = 0;
+        if (baseData && baseData.routes && baseData.routes.length > 0) {
+            baseDist = baseData.routes[0].distance;
+            baseMinutes = Math.round((baseDist / 1000) / 4.0 * 60);
+        }
+        const metersPerMin = 4000 / 60; // 4km/h -> m/min
+        let neededMeters = Math.max(0, (minAllowed - baseMinutes) * metersPerMin);
+        if (neededMeters <= 0) return { pts, data: baseData, walkMinutes: baseMinutes, distMeters: baseDist };
 
-        // 各候補について「挿入したときに増える概算距離」を計算して降順ソート
-        const scored = candidates.map(c => {
-            // 挿入地点は基本的にゴール直前に挿入する想定
-            const last = goalPt; // 現在の終端
-            const base = approxMeters(last.lat, last.lon, startPt.lat, startPt.lon); // not used but kept for clarity
-            const direct = approxMeters(last.lat, last.lon, goalPt.lat, goalPt.lon);
-            const viaCand = approxMeters(last.lat, last.lon, c.lat, c.lon) + approxMeters(c.lat, c.lon, goalPt.lat, goalPt.lon);
-            const addedMeters = viaCand - direct;
-            return { cand: c, addedMeters };
-        }).filter(s => s.addedMeters > 10); // ほとんど増えない候補は無視
-
-        // ユーザームードで水辺優先のバイアスをかける
-        const mood = (window.userMood || '').toString();
-        if (mood.includes('川') || mood.includes('水') || mood.includes('海')) {
-            scored.forEach(s => { if ((s.cand.type||'').includes('水')) s.addedMeters *= 1.5; });
+        // 関心範囲: 各区間 (pts[i-1] -> pts[i]) に候補を挿入した時の増分を計算
+        function scoreCandidateForPositions(cand, ptsArr) {
+            const scores = [];
+            for (let i = 1; i < ptsArr.length; i++) {
+                const a = ptsArr[i-1]; const b = ptsArr[i];
+                const before = approxMeters(a.lat, a.lon, b.lat, b.lon);
+                const via = approxMeters(a.lat, a.lon, cand.lat, cand.lon) + approxMeters(cand.lat, cand.lon, b.lat, b.lon);
+                const added = via - before;
+                scores.push({ pos: i, addedMeters: added });
+            }
+            // 最大増分と位置を返す
+            scores.sort((x,y) => y.addedMeters - x.addedMeters);
+            return scores[0] || { pos: 1, addedMeters: 0 };
         }
 
-        scored.sort((a,b) => b.addedMeters - a.addedMeters);
-
+        // 繰り返し: 必要メートルを満たすまで貪欲に追加
         let ptsCopy = pts.slice();
-        let localData = null; let localDist = 0; let localMinutes = 0;
-        const MAX_ADDITIONS = 10; let added = 0;
+        let localData = baseData; let localDist = baseDist; let localMinutes = baseMinutes;
+        const MAX_ADDITIONS = 12; let additions = 0;
+        while (neededMeters > 10 && additions < MAX_ADDITIONS) {
+            // 各候補のベスト増分を評価
+            const scored = [];
+            for (const c of candidates) {
+                const best = scoreCandidateForPositions(c, ptsCopy);
+                // ムードで水辺優先バイアス
+                let bias = 1;
+                const mood = (window.userMood||'').toString();
+                if ((mood.includes('川')||mood.includes('水')||mood.includes('海')) && (c.type||'').includes('水')) bias = 1.3;
+                scored.push({ cand: c, pos: best.pos, addedMeters: best.addedMeters * bias });
+            }
+            // 上位を選ぶ
+            scored.sort((a,b) => b.addedMeters - a.addedMeters);
+            if (scored.length === 0 || scored[0].addedMeters <= 5) break; // 有効な候補なし
 
-        for (const s of scored) {
-            if (added >= MAX_ADDITIONS) break;
-            const c = s.cand;
-            const insertPos = Math.max(1, ptsCopy.length - 1);
-            const newPt = { name: c.name || '追加スポット', lat: c.lat, lon: c.lon, photo_tip: '' };
-            ptsCopy.splice(insertPos, 0, newPt);
+            const pick = scored[0];
+            // 挿入
+            const newPt = { name: pick.cand.name || '追加スポット', lat: pick.cand.lat, lon: pick.cand.lon, photo_tip: '' };
+            ptsCopy.splice(pick.pos, 0, newPt);
+            additions++;
+            log(`➕ 挿入: ${newPt.name} を位置 ${pick.pos} に追加 (推定 +${Math.round(pick.addedMeters)}m)`);
+
+            // OSRMで再評価
             localData = await getOsrmForPoints(ptsCopy);
             if (localData && localData.routes && localData.routes.length > 0) {
                 localDist = localData.routes[0].distance;
                 localMinutes = Math.round((localDist / 1000) / 4.0 * 60);
             } else { localDist = 0; localMinutes = 0; }
-            added++;
-            log(`➕ 追加候補を挿入: ${newPt.name} (推定増分 ${Math.round(s.addedMeters)}m) => 所要 ${localMinutes}分`);
-            if (localMinutes >= minAllowed) {
-                log(`✅ 追加により下限 ${minAllowed}分 を満たしました。`);
-                return { pts: ptsCopy, data: localData, walkMinutes: localMinutes, distMeters: localDist };
-            }
+            neededMeters = Math.max(0, (minAllowed - localMinutes) * metersPerMin);
+
+            // 候補リストから使ったものを除去
+            candidates = candidates.filter(c => c.name !== pick.cand.name || Math.abs(c.lat - pick.cand.lat) > 1e-6);
         }
 
-        // 中間点挿入も試みる（最後の手段）
-        if (localMinutes < minAllowed) {
-            const maxMidpoints = 6; let midsAdded = 0;
-            for (let i = 0; i < ptsCopy.length - 1 && midsAdded < maxMidpoints; i++) {
+        // それでも不足なら中間点で微調整（最終手段）
+        if (neededMeters > 10) {
+            let midsAdded = 0; const maxMids = 8;
+            for (let i = 0; i < ptsCopy.length - 1 && midsAdded < maxMids && neededMeters > 10; i++) {
                 const a = ptsCopy[i]; const b = ptsCopy[i+1];
                 const mid = { name: 'ちょっと寄り道', lat: (a.lat + b.lat)/2, lon: (a.lon + b.lon)/2, photo_tip: '' };
                 ptsCopy.splice(i+1, 0, mid);
@@ -718,12 +732,8 @@ async function drawSmartRoute(routePoints) {
                     localDist = localData.routes[0].distance;
                     localMinutes = Math.round((localDist / 1000) / 4.0 * 60);
                 } else { localDist = 0; localMinutes = 0; }
-                midsAdded++;
-                log(`🔁 中間点挿入で所要 ${localMinutes}分`);
-                if (localMinutes >= minAllowed) {
-                    log(`✅ 中間点で下限を満たしました。`);
-                    return { pts: ptsCopy, data: localData, walkMinutes: localMinutes, distMeters: localDist };
-                }
+                neededMeters = Math.max(0, (minAllowed - localMinutes) * metersPerMin);
+                midsAdded++; log(`🔁 中間点追加で所要 ${localMinutes}分`);
             }
         }
 
