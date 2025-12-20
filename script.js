@@ -387,6 +387,22 @@ async function fetchOverpass(lat, lon) {
             addSpotToMap(elLat, elLon, type, name || type, "OSM", bg, icon, el.id);
         });
         log(`🌍 OSM: ${data.elements.length}件`);
+        // OSMの水辺で同名スポットが複数ある場合、それらを線で結ぶ（簡易）
+        try {
+            const waterGroups = {};
+            gatheredSpots.forEach(s => {
+                if ((s.type||'').includes('水') && s.name) {
+                    (waterGroups[s.name] = waterGroups[s.name] || []).push([s.lat, s.lon]);
+                }
+            });
+            Object.keys(waterGroups).forEach(name => {
+                const pts = waterGroups[name];
+                if (pts.length >= 2) {
+                    const poly = L.polyline(pts, { color: '#1E90FF', weight: 3, dashArray: '6,6', opacity: 0.8 }).addTo(routeLayer);
+                    poly.bindPopup(`水辺: ${name}`);
+                }
+            });
+        } catch(e) { log('❌ 同名水辺線描画でエラー: ' + e.message); }
     } catch(e) { log(`❌ OSMエラー: ${e.message}`); }
 }
 
@@ -682,6 +698,33 @@ async function drawSmartRoute(routePoints) {
             return scores[0] || { pos: 1, addedMeters: 0 };
         }
 
+        // 基準ジオメトリ（重複検出に使用）
+        let baseGeom = [];
+        if (baseData && baseData.routes && baseData.routes.length > 0 && baseData.routes[0].geometry) {
+            baseGeom = baseData.routes[0].geometry.coordinates.slice(); // [lon,lat] pairs
+        }
+
+        // ヘルパ: ジオメトリ重複率を計算（共通の座標ペア割合）
+        function overlapRatio(geomA, geomB) {
+            if (!geomA || !geomB || geomA.length === 0 || geomB.length === 0) return 0;
+            const round = (v) => Math.round(v * 10000) / 10000; // 約11m精度
+            const setA = new Set();
+            for (let i = 0; i < geomA.length - 1; i++) {
+                const a0 = geomA[i]; const a1 = geomA[i+1];
+                setA.add(`${round(a0[1])},${round(a0[0])}|${round(a1[1])},${round(a1[0])}`);
+                setA.add(`${round(a1[1])},${round(a1[0])}|${round(a0[1])},${round(a0[0])}`);
+            }
+            let common = 0;
+            let total = 0;
+            for (let i = 0; i < geomB.length - 1; i++) {
+                const b0 = geomB[i]; const b1 = geomB[i+1];
+                const key = `${round(b0[1])},${round(b0[0])}|${round(b1[1])},${round(b1[0])}`;
+                total++;
+                if (setA.has(key)) common++;
+            }
+            return total === 0 ? 0 : (common / total);
+        }
+
         // 繰り返し: 必要メートルを満たすまで貪欲に追加
         let ptsCopy = pts.slice();
         let localData = baseData; let localDist = baseDist; let localMinutes = baseMinutes;
@@ -701,7 +744,29 @@ async function drawSmartRoute(routePoints) {
             scored.sort((a,b) => b.addedMeters - a.addedMeters);
             if (scored.length === 0 || scored[0].addedMeters <= 5) break; // 有効な候補なし
 
-            const pick = scored[0];
+            // 追加候補のうち上位数件をOSRMでシミュレーションし、既存ルートとの重複を評価してペナルティ
+            const TOP_SIM = Math.min(6, scored.length);
+            for (let i = 0; i < TOP_SIM; i++) {
+                const s = scored[i];
+                const simPts = ptsCopy.slice();
+                const newPt = { name: s.cand.name || '追加スポット', lat: s.cand.lat, lon: s.cand.lon, photo_tip: '' };
+                simPts.splice(s.pos, 0, newPt);
+                try {
+                    const simData = await getOsrmForPoints(simPts);
+                    if (simData && simData.routes && simData.routes.length > 0 && simData.routes[0].geometry) {
+                        const simGeom = simData.routes[0].geometry.coordinates;
+                        const ov = overlapRatio(baseGeom, simGeom);
+                        // 重複が大きければ大幅ペナルティ、 moderate なら段階的に減衰
+                        if (ov > 0.6) { s.addedMeters = 0; s.skip = true; log(`✖️ 候補 ${s.cand.name} は既存経路と ${Math.round(ov*100)}% 重複するため除外`); }
+                        else if (ov > 0.2) { s.addedMeters *= (1 - ov * 0.9); log(`⚠️ 候補 ${s.cand.name} は経路と ${Math.round(ov*100)}% 重複。重みを調整`); }
+                    }
+                } catch(e) { log(`❌ 候補シミュレーションエラー: ${e.message}`); }
+            }
+
+            // 再ソートして最良を選ぶ
+            scored.sort((a,b) => b.addedMeters - a.addedMeters);
+            const pick = scored.find(s => !s.skip) || scored[0];
+
             // 挿入
             const newPt = { name: pick.cand.name || '追加スポット', lat: pick.cand.lat, lon: pick.cand.lon, photo_tip: '' };
             ptsCopy.splice(pick.pos, 0, newPt);
