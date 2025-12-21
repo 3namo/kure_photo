@@ -35,20 +35,19 @@ window.onload = function() {
     gpsMode = false;
     updateLocationHint();
 
-    // マップクリックイベント（GPS OFFの時のみ有効）
+    // マップクリックイベント
     map.on('click', function(e) {
         if (!gpsMode) {
             handleMapClick(e);
         }
     });
 
-    // マップクリック時の処理。AIプランがある場合は確認を促してから実行する
+    // マップクリック時の処理
     async function handleMapClick(e) {
         try {
             if (window.routeLocked) {
                 const ok = await showConfirmation('新しい探索を開始しますか？', '現在のAIプランは破棄されます。続行して新しい場所を指定しますか？');
                 if (!ok) return;
-                // ユーザーが続行を選んだ場合はロック解除して進める
                 window.routeLocked = false;
                 try { showNewSearchButton(false); } catch(e) {}
             }
@@ -63,21 +62,17 @@ window.onload = function() {
         input.addEventListener('input', saveSettings);
     });
 
-    // リサイザーの初期化
     initResizer();
-    // レイアウト調整: AI結果領域の高さを調整
     adjustAiResponseHeight();
     window.addEventListener('resize', adjustAiResponseHeight);
-    // 新しい探索ボタンの初期設定
+    
     const newBtn = document.getElementById('btn-new-search');
     if (newBtn) {
         newBtn.addEventListener('click', async function() {
             const ok = await showConfirmation('新しい探索を開始しますか？', '現在のAIプランは破棄されます。続行しますか？');
             if (!ok) return;
-            // 解除してマップクリックで新規探索を受け付ける
             window.routeLocked = false;
             showNewSearchButton(false);
-            // 既存ルートをクリア
             try { routeLayer.clearLayers(); } catch(e) {}
             document.getElementById('ai-response').innerHTML = '既存のプランを破棄しました。地図をクリックして新しい現在地を指定してください。';
         });
@@ -90,7 +85,6 @@ function showNewSearchButton(show) {
     btn.style.display = show ? 'block' : 'none';
 }
 
-// 汎用モーダルを表示してユーザーの選択を待つ（Promise）
 function showConfirmation(title, message) {
     return new Promise((resolve) => {
         const overlay = document.getElementById('confirm-modal');
@@ -115,7 +109,6 @@ function showConfirmation(title, message) {
         okBtn.addEventListener('click', onOk);
         cancelBtn.addEventListener('click', onCancel);
 
-        // ESCでキャンセル
         function onKey(e) { if (e.key === 'Escape') { onCancel(); window.removeEventListener('keydown', onKey); } }
         window.addEventListener('keydown', onKey);
     });
@@ -124,47 +117,39 @@ function showConfirmation(title, message) {
 function initResizer() {
     const resizer = document.getElementById('resizer');
     const sidebar = document.getElementById('sidebar');
-
     resizer.addEventListener('mousedown', function(e) {
         isResizing = true;
         document.body.style.cursor = 'col-resize';
     });
-
     document.addEventListener('mousemove', function(e) {
         if (!isResizing) return;
         const newWidth = Math.max(200, Math.min(800, e.clientX));
         sidebar.style.width = newWidth + 'px';
         map.invalidateSize();
     });
-
     document.addEventListener('mouseup', function(e) {
         if (isResizing) {
             isResizing = false;
             document.body.style.cursor = 'default';
-            // リサイズ完了後にAIレスポンス高さを再計算
             adjustAiResponseHeight();
         }
     });
 }
 
-// サイドバー内の AI レスポンス領域の高さを残り領域に合わせる
 function adjustAiResponseHeight() {
     const sidebar = document.getElementById('sidebar');
     const aiDetails = document.getElementById('ai-result-details');
     const resp = document.querySelector('.ai-response-content');
     if (!sidebar || !aiDetails || !resp) return;
-    // 合計高さを算出: aiDetailsより前にある子要素の高さを引く
     let sum = 0;
     for (const ch of Array.from(sidebar.children)) {
         if (ch === aiDetails) break;
         sum += ch.offsetHeight || 0;
     }
-    // 少しマージンを残す
     const avail = Math.max(120, sidebar.clientHeight - sum - 24);
     resp.style.maxHeight = avail + 'px';
 }
 
-// 設定の保存・読み込み
 function saveSettings() {
     const settings = {
         geminiKey: document.getElementById('gemini-key').value,
@@ -228,7 +213,6 @@ function getCurrentLocation() {
             log(`✅ GPS成功: ${lat.toFixed(4)}, ${lon.toFixed(4)}`);
             map.setView([lat, lon], 16);
             if (currentLocationMarker) markersLayer.removeLayer(currentLocationMarker);
-            
             const icon = L.divIcon({
                 className: '',
                 html: `<div style="width:28px; height:28px; background:#007bff; border-radius:50%; border:3px solid white; box-shadow:0 0 10px rgba(0,123,255,0.5);"></div>`,
@@ -258,7 +242,6 @@ function toggleDatasetInput() {
     }
 }
 
-// 時計
 setInterval(() => {
     const now = new Date();
     const clockEl = document.getElementById('clock');
@@ -282,12 +265,11 @@ async function startExploration(lat, lon) {
     if (!gpsMode) markersLayer.clearLayers();
     routeLayer.clearLayers();
     
-    // 現在地マーカー
     if (!gpsMode) L.marker([lat, lon]).addTo(markersLayer).bindPopup("現在地").openPopup();
     
     document.getElementById('btn-search').disabled = true;
     document.getElementById('ai-response').innerHTML = "データ収集中...";
-    document.getElementById('ai-result-details').open = false; // 一旦閉じる
+    document.getElementById('ai-result-details').open = false; 
     document.getElementById('log-area').innerHTML = ""; 
     log(`📍 探索開始: ${lat.toFixed(4)}, ${lon.toFixed(4)}`);
 
@@ -297,7 +279,7 @@ async function startExploration(lat, lon) {
 
     const promises = [];
     promises.push(fetchWeather(lat, lon));
-    promises.push(fetchOverpass(lat, lon)); // ★修正版のOverpass呼び出し
+    promises.push(fetchOverpass(lat, lon));
     if(idManhole) promises.push(fetchKureData(idManhole, "デザインマンホール"));
     if(idCulture) promises.push(fetchKureData(idCulture, "文化財・レトロ"));
     if(idShelter) promises.push(fetchKureData(idShelter, "避難所・高台"));
@@ -309,7 +291,6 @@ async function startExploration(lat, lon) {
     document.getElementById('ai-response').innerHTML = `データ収集完了！<br>現在の天気: ${weatherDescription}<br>発見スポット: ${gatheredSpots.length}件<br>「AIにプランを聞く」を押してください。`;
 }
 
-// 天気取得
 async function fetchWeather(lat, lon) {
     if (WEATHER_API_KEY.includes("貼り付け")) { log("⚠️ Weatherキー未設定"); return; }
     try {
@@ -346,7 +327,6 @@ async function fetchWeather(lat, lon) {
             div.className = "forecast-item";
             div.innerHTML = `<div class="forecast-time">${time}</div><img class="forecast-icon" src="${icon}"><div class="forecast-temp">${temp}℃</div>`;
             container.appendChild(div);
-            
             forecastText += `${time}は${item.weather[0].description}(${temp}℃), `;
         });
         log(`🔮 予報取得: ${list.length}件`);
@@ -356,36 +336,31 @@ async function fetchWeather(lat, lon) {
     }
 }
 
-// ★修正版: Overpass API (神社/寺/川を厳格に区別)
 async function fetchOverpass(lat, lon) {
-    log("🌍 OSMデータ検索中(区別強化版)...");
-        const query = `
-                [out:json][timeout:30];
-                (
-                    node["amenity"="place_of_worship"](around:1600,${lat},${lon});
-                    way["amenity"="place_of_worship"](around:1600,${lat},${lon});
-                    node["religion"="buddhist"](around:1600,${lat},${lon});
-                    way["religion"="buddhist"](around:1600,${lat},${lon});
-
-                    node["man_made"="torii"](around:1600,${lat},${lon});
-                    way["man_made"="torii"](around:1600,${lat},${lon});
-
-                    node["tourism"="viewpoint"](around:1600,${lat},${lon});
-                    node["historic"](around:1600,${lat},${lon});
-                    node["waterway"~"waterfall|stream|river|canal"](around:1600,${lat},${lon});
-                    way["waterway"~"river|stream|canal|riverbank"](around:1600,${lat},${lon});
-                    relation["waterway"~"river|stream|canal"](around:1600,${lat},${lon});
-                    way["natural"="coastline"](around:1600,${lat},${lon});
-
-                    way["highway"="steps"](around:1000,${lat},${lon});
-                    way["highway"="path"](around:1000,${lat},${lon});
-                    node["amenity"="vending_machine"](around:1000,${lat},${lon});
-
-                    node["natural"="water"](around:1600,${lat},${lon});
-                    way["natural"="water"](around:1600,${lat},${lon});
-                );
-                out center;
-        `;
+    log("🌍 OSMデータ検索中...");
+    const query = `
+        [out:json][timeout:30];
+        (
+            node["amenity"="place_of_worship"](around:1600,${lat},${lon});
+            way["amenity"="place_of_worship"](around:1600,${lat},${lon});
+            node["religion"="buddhist"](around:1600,${lat},${lon});
+            way["religion"="buddhist"](around:1600,${lat},${lon});
+            node["man_made"="torii"](around:1600,${lat},${lon});
+            way["man_made"="torii"](around:1600,${lat},${lon});
+            node["tourism"="viewpoint"](around:1600,${lat},${lon});
+            node["historic"](around:1600,${lat},${lon});
+            node["waterway"~"waterfall|stream|river|canal"](around:1600,${lat},${lon});
+            way["waterway"~"river|stream|canal|riverbank"](around:1600,${lat},${lon});
+            relation["waterway"~"river|stream|canal"](around:1600,${lat},${lon});
+            way["natural"="coastline"](around:1600,${lat},${lon});
+            way["highway"="steps"](around:1000,${lat},${lon});
+            way["highway"="path"](around:1000,${lat},${lon});
+            node["amenity"="vending_machine"](around:1000,${lat},${lon});
+            node["natural"="water"](around:1600,${lat},${lon});
+            way["natural"="water"](around:1600,${lat},${lon});
+        );
+        out center;
+    `;
     const url = "https://overpass-api.de/api/interpreter?data=" + encodeURIComponent(query);
     try {
         const res = await fetch(url);
@@ -393,13 +368,11 @@ async function fetchOverpass(lat, lon) {
         let data;
         const contentType = (res.headers.get('content-type') || '').toLowerCase();
         
-        if (!res.ok) {
-            throw new Error(`${res.status} ${res.statusText}: ${raw.slice(0,200)}`);
-        }
+        if (!res.ok) throw new Error(`${res.status}`);
+        
         if (contentType.includes('application/json') || raw.trim().startsWith('{') || raw.trim().startsWith('[')) {
             data = JSON.parse(raw);
         } else {
-            log('❗ OSM: OverpassがHTMLを返しました。フォールバックを試行します...');
             const altServers = [
                 'https://lz4.overpass-api.de/api/interpreter?data=',
                 'https://overpass.openstreetmap.fr/api/interpreter?data=',
@@ -416,8 +389,9 @@ async function fetchOverpass(lat, lon) {
                     }
                 } catch(e) { }
             }
-            if (!ok) throw new Error('Overpass: JSON応答取得失敗（フォールバック含む）');
+            if (!ok) throw new Error('Overpass: JSON応答取得失敗');
         }
+        
         data.elements.forEach(el => {
             const tags = el.tags || {};
             const elLat = el.lat || (el.center && el.center.lat);
@@ -444,15 +418,11 @@ async function fetchOverpass(lat, lon) {
                 type = "自販機"; bg = "bg-vending"; icon = "fa-bottle-water";
             }
 
-            let name = tags.name || tags.alt_name || tags.location_name || "";
+            let name = tags.name || tags.alt_name || "";
             if (name && /二河川/.test(name)) return;
-
             if (!name && !(tags.highway === "steps" || tags.amenity === "vending_machine")) {
-                if (type === "水辺・川・海") {
-                    name = tags.waterway || tags.natural || '無名の水辺';
-                } else {
-                    return;
-                }
+                if (type === "水辺・川・海") name = tags.waterway || tags.natural || '無名の水辺';
+                else return;
             }
 
             addSpotToMap(elLat, elLon, type, name || type, "OSM", bg, icon, el.id);
@@ -486,20 +456,6 @@ async function fetchKureData(endpointId, label) {
             for (const [a,b] of candidates) {
                 if (a != null && b != null) return [Number(a), Number(b)];
             }
-            const loc = it.location || it.location_data || it.position || it.pos || it.locationObject;
-            if (loc) {
-                const nested = [
-                    [loc.latitude, loc.longitude], [loc.lat, loc.lon], [loc.lat, loc.lng],
-                    [loc.latitude_wgs84, loc.longitude_wgs84]
-                ];
-                for (const [a,b] of nested) {
-                    if (a != null && b != null) return [Number(a), Number(b)];
-                }
-            }
-            if (it.geometry && it.geometry.coordinates) {
-                const c = it.geometry.coordinates;
-                return [Number(c[1]), Number(c[0])];
-            }
             return [null, null];
         }
 
@@ -531,7 +487,6 @@ async function fetchKureData(endpointId, label) {
 
 function addSpotToMap(lat, lon, type, name, source, bgClass, iconClass="fa-map-pin", osmId=null) {
     if(gatheredSpots.some(s => s.name === name && Math.abs(s.lat - lat) < 0.0001)) return;
-
     gatheredSpots.push({ lat, lon, type, name, source, osmId });
     let html = '';
     if (bgClass === 'bg-temple') {
@@ -541,15 +496,8 @@ function addSpotToMap(lat, lon, type, name, source, bgClass, iconClass="fa-map-p
     } else {
         html = `<div class="custom-icon ${bgClass}" style="width:24px; height:24px;"></div>`;
     }
-
-    const icon = L.divIcon({
-        className: '',
-        html: html,
-        iconSize: [24, 24], iconAnchor: [12, 12], popupAnchor: [0, -12]
-    });
-    L.marker([lat, lon], {icon: icon})
-        .bindPopup(`<b>${name}</b><br>${type}<br><small>${source}</small>`)
-        .addTo(markersLayer);
+    const icon = L.divIcon({ className: '', html: html, iconSize: [24, 24], iconAnchor: [12, 12], popupAnchor: [0, -12] });
+    L.marker([lat, lon], {icon: icon}).bindPopup(`<b>${name}</b><br>${type}<br><small>${source}</small>`).addTo(markersLayer);
 }
 
 // ==========================================
@@ -572,44 +520,67 @@ async function askAI() {
 
     const scoredSpots = gatheredSpots.map(spot => {
         let score = 0;
+        // 1. 基本スコア
         if (mood.includes("神社") && spot.type === "神社") score += 300;
         else if (mood.includes("神社") && spot.type === "寺院") score -= 100;
         
         if ((mood.includes("寺") || mood.includes("仏閣")) && spot.type === "寺院") score += 300;
         if ((mood.includes("海") || mood.includes("川") || mood.includes("水")) && spot.type.includes("水")) score += 200;
         if (mood.includes("レトロ") && (spot.type.includes("歴史") || spot.type === "マンホール")) score += 100;
-        if (spot.type && spot.type.includes("避難所")) {
-            if (mood.includes("避難") || mood.includes("避難所")) score += 50; else score -= 200;
-        }
+        
+        // 2. ニュアンス対応（景色、高台）
         if (spot.type && (spot.type.includes("絶景") || spot.type.includes("高台"))) {
-            if (mood.includes("景") || mood.includes("view")) score += 150; else score += 30;
+            if (mood.includes("景") || mood.includes("view") || mood.includes("高台")) score += 200;
+            else score += 50; // 指定がなくても景色が良い場所はプラス
         }
-        return { ...spot, score: score + Math.random() * 10 };
+        
+        // 3. 避難所（景色が良いことが多いが、明示されない限り優先度は低めにするが排除はしない）
+        if (spot.type && spot.type.includes("避難所")) {
+            if (mood.includes("避難") || mood.includes("高台") || mood.includes("景色")) score += 50;
+            else score -= 50; 
+        }
+
+        return { ...spot, score: score + Math.random() * 20 }; // ランダム性を高めて多様なスポットを候補に入れる
     });
 
     scoredSpots.sort((a, b) => b.score - a.score);
-    const spotsListJson = scoredSpots.slice(0, 40).map(s => ({ name: s.name, type: s.type, lat: s.lat, lon: s.lon }));
+    // 候補数を増やしてAIの選択肢を広げる (40 -> 60)
+    const spotsListJson = scoredSpots.slice(0, 60).map(s => ({ name: s.name, type: s.type, lat: s.lat, lon: s.lon }));
 
+    // ★改善されたプロンプト: 自由度と時間消費を強調
     const prompt = `
-あなたは呉市のフォトスポットガイドです。
-ユーザーの要望「${mood}」に基づき、最も適した散歩ルートを1つ作成してください。
+あなたは呉市のベテラン観光ガイドです。
+ユーザーの要望: 「${mood}」
+目標所要時間: ${duration}分
+ゴール地点: "${destination}"
+現在の天気: ${weatherDescription}
 
-【厳守条件】
-- 現在地からスタートすること。
-- 所要時間: ${duration}分。
-- ゴール: "${destination}"。
-- 天気: ${weatherDescription}。
-- 「神社」要望なら種別「神社」を含め「寺院」で代用しないこと。「川」「海」なら「水辺」スポットを含めること。
-- JSON形式のみで回答。
+【重要指令】
+1. **要望の分解と再構成:**
+   - ユーザーが「AのあとにB」と言ったら、その順序を守りつつ、**移動時間の隙間を埋める提案**をしてください。
+   - 例: 「神社→高台」なら、その間にある「レトロな路地」「古い商店」「小さな公園」などを経由地に加えて、退屈させないルートにしてください。
 
-【スポット候補 (優先度順)】
+2. **時間の徹底消費:**
+   - 単に「AとBに行って終わり」にするのは厳禁です。それでは時間が余ります。
+   - ${duration}分をフルに使い切るために、**要望には書かれていないが、通り道にある魅力的なスポット（Fillers）**を積極的にルートに組み込んでください。
+   - 寄り道、遠回り大歓迎です。「せっかくなのでここも見ていきましょう」というスタンスでプランを作ってください。
+
+3. **出力形式:**
+   - 必ず以下のJSON形式のみで出力してください。
+
+【スポット候補リスト】
 ${JSON.stringify(spotsListJson)}
 
 【出力JSON】
 {
-    "theme": "ルートのキャッチコピー",
+    "theme": "ルートの魅力的なタイトル",
     "route": [
-        { "name": "スポット名", "lat": 0.0, "lon": 0.0, "photo_tip": "撮影アドバイス" }
+        { 
+            "name": "スポット名（候補リストから選択、または近隣の一般的な名称）", 
+            "lat": 緯度, 
+            "lon": 経度, 
+            "photo_tip": "この場所での撮影アドバイスや、なぜここを経由するのかの理由" 
+        }
     ]
 }
 `;
@@ -645,7 +616,7 @@ async function drawSmartRoute(routePoints) {
     if(!routePoints || routePoints.length === 0) return;
 
     const requested = (window.requestedDuration !== undefined) ? Number(window.requestedDuration) : null;
-    const minAllowed = requested ? Math.max(0, requested - 10) : null;
+    const minAllowed = requested ? Math.max(0, requested - 15) : null; // 許容範囲を少し広げる
 
     async function getOsrmForPoints(points) {
         const waypoints = [[currentLon, currentLat], ...points.map(p => [p.lon, p.lat])];
@@ -655,6 +626,7 @@ async function drawSmartRoute(routePoints) {
         return await res.json();
     }
 
+    // 距離が足りない場合の延伸ロジック
     async function tryExpandRouteToMinMinutes(pts, minAllowed, requested) {
         const used = new Set(pts.map(p => (p.name || (p.lat + ',' + p.lon))));
         let candidates = gatheredSpots.filter(s => !used.has(s.name));
@@ -718,7 +690,7 @@ async function drawSmartRoute(routePoints) {
 
         let ptsCopy = pts.slice();
         let localData = baseData; let localDist = baseDist; let localMinutes = baseMinutes;
-        const MAX_ADDITIONS = 12; let additions = 0;
+        const MAX_ADDITIONS = 15; let additions = 0; // 試行回数を増やす
         while (neededMeters > 10 && additions < MAX_ADDITIONS) {
             const scored = [];
             for (const c of candidates) {
@@ -762,22 +734,6 @@ async function drawSmartRoute(routePoints) {
             }
             neededMeters = Math.max(0, (minAllowed - localMinutes) * metersPerMin);
             candidates = candidates.filter(c => c.name !== pick.cand.name || Math.abs(c.lat - pick.cand.lat) > 1e-6);
-        }
-
-        if (neededMeters > 10) {
-            let midsAdded = 0; const maxMids = 8;
-            for (let i = 0; i < ptsCopy.length - 1 && midsAdded < maxMids && neededMeters > 10; i++) {
-                const a = ptsCopy[i]; const b = ptsCopy[i+1];
-                const mid = { name: 'ちょっと寄り道', lat: (a.lat + b.lat)/2, lon: (a.lon + b.lon)/2, photo_tip: '' };
-                ptsCopy.splice(i+1, 0, mid);
-                localData = await getOsrmForPoints(ptsCopy);
-                if (localData && localData.routes && localData.routes.length > 0) {
-                    localDist = localData.routes[0].distance;
-                    localMinutes = Math.round((localDist / 1000) / 4.0 * 60);
-                }
-                neededMeters = Math.max(0, (minAllowed - localMinutes) * metersPerMin);
-                midsAdded++;
-            }
         }
         return { pts: ptsCopy, data: localData, walkMinutes: localMinutes, distMeters: localDist };
     }
@@ -865,28 +821,44 @@ async function drawSmartRoute(routePoints) {
             walkMinutes = Math.round((distMeters / 1000) / 4.0 * 60);
         }
 
-        if (requested && walkMinutes > requested) {
-            log(`⏱ ルート ${walkMinutes}分 は希望 ${requested}分 を超えています。短縮を試行します...`);
+        // 短すぎる場合の延伸
+        if (requested && minAllowed !== null && walkMinutes < minAllowed) {
+            log(`⚠️ ルート ${walkMinutes}分 は短すぎます。自動延伸します...`);
+            const expanded = await tryExpandRouteToMinMinutes(pts, minAllowed, requested);
+            if (expanded && expanded.walkMinutes >= minAllowed) {
+                pts = expanded.pts;
+                data = expanded.data || data;
+                walkMinutes = expanded.walkMinutes;
+                distMeters = expanded.distMeters;
+                log(`✅ 延伸成功: ${walkMinutes}分`);
+            } else {
+                log(`⚠️ 延伸しましたが目標に届きませんでした（${expanded.walkMinutes}分）`);
+            }
+        }
+
+        // 長すぎる場合の短縮
+        if (requested && walkMinutes > requested + 15) { // 許容誤差を少し持たせる
+            log(`⏱ ルート ${walkMinutes}分 は長すぎます。短縮します...`);
             while (pts.length > 1) {
                 pts.pop();
                 data = await getOsrmForPoints(pts);
                 if (data.routes && data.routes.length > 0) {
                     distMeters = data.routes[0].distance;
                     walkMinutes = Math.round((distMeters / 1000) / 4.0 * 60);
-                } else {
-                    walkMinutes = 0; distMeters = 0;
                 }
-                if (walkMinutes <= requested) break;
+                if (walkMinutes <= requested + 5) break;
             }
-            routePoints = pts;
+            log(`✅ 短縮完了: ${walkMinutes}分`);
         }
 
+        // 描画処理
         if (data.routes && data.routes.length > 0 && data.routes[0].geometry) {
             const route = data.routes[0];
             const coordinates = route.geometry.coordinates;
             const hotlineData = coordinates.map((c, index) => [c[1], c[0], index / (coordinates.length - 1)]);
             const coordsLatLon = coordinates.map(c => [c[1], c[0]]);
 
+            // 重複区間検出関数
             function detectRepeatedSegments(latlonArr) {
                 const seen = new Set();
                 for (let i = 1; i < latlonArr.length; i++) {
@@ -900,6 +872,7 @@ async function drawSmartRoute(routePoints) {
                 return false;
             }
 
+            // オフセット関数
             function offsetCoordinates(latlonArr, offsetMeters) {
                 if (!latlonArr || latlonArr.length < 2) return latlonArr;
                 const out = [];
@@ -963,26 +936,13 @@ async function drawSmartRoute(routePoints) {
             }
 
             if(boundsObj) map.fitBounds(boundsObj.getBounds(), { padding: [50, 50], maxZoom: 17 });
-            addRouteMarkers(routePoints);
-            // ★修正: ここで計算済みの距離と時間を渡すことで表示されるようになる
-            renderRouteSidebar({ ...window.lastRouteData, distance: distMeters, walkMinutes: walkMinutes });
+            addRouteMarkers(pts);
+            renderRouteSidebar({ ...window.lastRouteData, route: pts, distance: distMeters, walkMinutes: walkMinutes }); // routeも更新されたptsを渡す
         } else {
-            addRouteMarkers(routePoints);
-            renderRouteSidebar({ ...window.lastRouteData, distance: 0, walkMinutes: 0 });
+            addRouteMarkers(pts);
+            renderRouteSidebar({ ...window.lastRouteData, route: pts, distance: 0, walkMinutes: 0 });
         }
 
-        if (requested && minAllowed !== null && walkMinutes < minAllowed) {
-            log(`⚠️ ルート所要時間 ${walkMinutes}分 は希望下限 ${minAllowed}分 より短いです。自動でスポットを追加して延伸を試みます...`);
-            const expanded = await tryExpandRouteToMinMinutes(pts, minAllowed, requested);
-            if (expanded && expanded.walkMinutes >= minAllowed) {
-                // 自動延伸成功時は再帰的に自分を呼んで描画し直すのがベストだが、
-                // 無限ループ防止のためここでは簡易的に変数を更新してログのみとする（既に描画済みのため）
-                // ※完全な再描画は複雑になるため、次の探索機会に委ねる
-                log(`✅ 自動延伸ロジックは動作しましたが、地図への反映は次の探索で行われます（${expanded.walkMinutes}分）。`);
-            } else {
-                log(`⚠️ 自動延伸でも下限に達しませんでした。`);
-            }
-        }
     } catch (e) {
         log("⚠️ 道案内取得失敗。直線で結びます。");
         console.error(e);
@@ -1010,10 +970,12 @@ function renderRouteSidebar(data) {
     let html = `<div class="route-theme">“ ${data.theme} ”</div>`;
     html += `<div class="route-meta"><i class="fa-solid fa-person-walking"></i> <span>${distStr}</span> &nbsp;/&nbsp; <i class="fa-solid fa-clock"></i> <span>${timeStr}</span></div>`;
     
-    data.route.forEach((step, index) => {
+    // AIが返したルート(data.route)を使うが、drawSmartRouteで修正されたptsが入っている場合はそちらを使う
+    const steps = data.route || []; 
+    steps.forEach((step, index) => {
         html += `<div class="route-step">
             <div class="step-name"><span style="color:#ff4500;">Step ${index + 1}:</span> ${step.name}</div>
-            <div class="step-photo"><i class="fa-solid fa-camera"></i> ${step.photo_tip}</div>
+            <div class="step-photo"><i class="fa-solid fa-camera"></i> ${step.photo_tip || ''}</div>
         </div>`;
     });
     html += `<small style="color:#666;">※青(スタート)から赤(ゴール)へ。<br>矢印の方向に進んでください。</small>`;
