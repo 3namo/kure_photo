@@ -110,7 +110,22 @@
                 <i class="accordion-arrow fa-solid fa-chevron-up"></i>
             </summary>
             <div id="ai-response" class="ai-response-content">地図をクリックすると探索を開始します。</div>
+            <div style="margin-top:8px;">
+                <button id="btn-new-search" style="display:none; width:100%; padding:8px; background:#ff6b6b; color:white; border:none; border-radius:6px;">新しい探索を開始</button>
+            </div>
         </details>
+    
+        <!-- モーダル: 新しい探索確認（洗練されたUI） -->
+        <div id="confirm-modal" class="confirm-modal-overlay" role="dialog" aria-modal="true" aria-hidden="true">
+            <div class="confirm-modal" role="document">
+                <h3 id="confirm-modal-title">新しい探索を開始しますか？</h3>
+                <p id="confirm-modal-message">現在のAIプランは破棄されます。よろしいですか？</p>
+                <div class="modal-actions">
+                    <button id="confirm-cancel" class="btn secondary">キャンセル</button>
+                    <button id="confirm-ok" class="btn danger">破棄して開始</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div id="resizer"></div>

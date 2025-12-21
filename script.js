@@ -36,11 +36,27 @@ window.onload = function() {
     updateLocationHint();
 
     // マップクリックイベント（GPS OFFの時のみ有効）
-    map.on('click', async function(e) {
+    map.on('click', function(e) {
         if (!gpsMode) {
-            await startExploration(e.latlng.lat, e.latlng.lng);
+            handleMapClick(e);
         }
     });
+
+    // マップクリック時の処理。AIプランがある場合は確認を促してから実行する
+    async function handleMapClick(e) {
+        try {
+            if (window.routeLocked) {
+                const ok = await showConfirmation('新しい探索を開始しますか？', '現在のAIプランは破棄されます。続行して新しい場所を指定しますか？');
+                if (!ok) return;
+                // ユーザーが続行を選んだ場合はロック解除して進める
+                window.routeLocked = false;
+                try { showNewSearchButton(false); } catch(e) {}
+            }
+            await startExploration(e.latlng.lat, e.latlng.lng);
+        } catch (err) {
+            console.error(err);
+        }
+    }
 
     const inputs = document.querySelectorAll('input');
     inputs.forEach(input => {
@@ -52,7 +68,58 @@ window.onload = function() {
     // レイアウト調整: AI結果領域の高さを調整
     adjustAiResponseHeight();
     window.addEventListener('resize', adjustAiResponseHeight);
+    // 新しい探索ボタンの初期設定
+    const newBtn = document.getElementById('btn-new-search');
+    if (newBtn) {
+        newBtn.addEventListener('click', async function() {
+            const ok = await showConfirmation('新しい探索を開始しますか？', '現在のAIプランは破棄されます。続行しますか？');
+            if (!ok) return;
+            // 解除してマップクリックで新規探索を受け付ける
+            window.routeLocked = false;
+            showNewSearchButton(false);
+            // 既存ルートをクリア
+            try { routeLayer.clearLayers(); } catch(e) {}
+            document.getElementById('ai-response').innerHTML = '既存のプランを破棄しました。地図をクリックして新しい現在地を指定してください。';
+        });
+    }
 };
+
+function showNewSearchButton(show) {
+    const btn = document.getElementById('btn-new-search');
+    if (!btn) return;
+    btn.style.display = show ? 'block' : 'none';
+}
+
+// 汎用モーダルを表示してユーザーの選択を待つ（Promise）
+function showConfirmation(title, message) {
+    return new Promise((resolve) => {
+        const overlay = document.getElementById('confirm-modal');
+        const t = document.getElementById('confirm-modal-title');
+        const m = document.getElementById('confirm-modal-message');
+        const okBtn = document.getElementById('confirm-ok');
+        const cancelBtn = document.getElementById('confirm-cancel');
+        if (!overlay || !okBtn || !cancelBtn || !t || !m) { resolve(confirm(message)); return; }
+        t.textContent = title || '確認';
+        m.textContent = message || '';
+        overlay.classList.add('show');
+        overlay.setAttribute('aria-hidden', 'false');
+
+        function cleanup() {
+            overlay.classList.remove('show');
+            overlay.setAttribute('aria-hidden', 'true');
+            okBtn.removeEventListener('click', onOk);
+            cancelBtn.removeEventListener('click', onCancel);
+        }
+        function onOk() { cleanup(); resolve(true); }
+        function onCancel() { cleanup(); resolve(false); }
+        okBtn.addEventListener('click', onOk);
+        cancelBtn.addEventListener('click', onCancel);
+
+        // ESCでキャンセル
+        function onKey(e) { if (e.key === 'Escape') { onCancel(); window.removeEventListener('keydown', onKey); } }
+        window.addEventListener('keydown', onKey);
+    });
+}
 
 function initResizer() {
     const resizer = document.getElementById('resizer');
@@ -595,7 +662,7 @@ async function askAI() {
     scoredSpots.sort((a, b) => b.score - a.score);
     const spotsListJson = scoredSpots.slice(0, 40).map(s => ({ name: s.name, type: s.type, lat: s.lat, lon: s.lon }));
 
-    const prompt = `
+        const prompt = `
 あなたは呉市のフォトスポットガイドです。
 ユーザーの要望「${mood}」に基づき、最も適した散歩ルートを1つ作成してください。
 
@@ -612,14 +679,13 @@ ${JSON.stringify(spotsListJson)}
 
 【出力JSON】
 {
-  "theme": "ルートのキャッチコピー",
-  "route": [
-    { "name": "スポット名", "lat": 数値, "lon": 数値, "photo_tip": "撮影アドバイス" }
-  ]
+    "theme": "ルートのキャッチコピー",
+    "route": [
+        { "name": "スポット名", "lat": 0.0, "lon": 0.0, "photo_tip": "撮影アドバイス" }
+    ]
 }
 `;
-
-    try {
+        try {
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL_NAME}:generateContent?key=${geminiKey}`;
         const res = await fetch(url, {
             method: 'POST',
@@ -635,8 +701,14 @@ ${JSON.stringify(spotsListJson)}
         const routeData = JSON.parse(text);
         window.lastRouteData = routeData;
 
-        log("🗺️ ルートデータ受信。詳細ルート描画中...");
-        await drawSmartRoute(routeData.route);
+        // 結果をまずUIに即時表示してから重めの描画処理を非同期で続行する
+        renderRouteSidebar(routeData);
+        window.routeLocked = true; // 生成後はマップクリックでのピン打ちをブロック
+        // 新しい探索ボタンを表示して、ユーザーが明示的に解除できるようにする
+        try { showNewSearchButton(true); } catch(e) {}
+        log("🗺️ ルートデータ受信。地図描画を開始します...");
+        // 描画は待たずにバックグラウンドで実行してUIの応答性を保つ
+        drawSmartRoute(routeData.route).catch(err => { console.error('drawSmartRoute error', err); });
 
     } catch(e) {
         console.error(e);
