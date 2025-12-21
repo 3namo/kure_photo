@@ -49,6 +49,9 @@ window.onload = function() {
 
     // リサイザーの初期化
     initResizer();
+    // レイアウト調整: AI結果領域の高さを調整
+    adjustAiResponseHeight();
+    window.addEventListener('resize', adjustAiResponseHeight);
 };
 
 function initResizer() {
@@ -71,8 +74,27 @@ function initResizer() {
         if (isResizing) {
             isResizing = false;
             document.body.style.cursor = 'default';
+            // リサイズ完了後にAIレスポンス高さを再計算
+            adjustAiResponseHeight();
         }
     });
+}
+
+// サイドバー内の AI レスポンス領域の高さを残り領域に合わせる
+function adjustAiResponseHeight() {
+    const sidebar = document.getElementById('sidebar');
+    const aiDetails = document.getElementById('ai-result-details');
+    const resp = document.querySelector('.ai-response-content');
+    if (!sidebar || !aiDetails || !resp) return;
+    // 合計高さを算出: aiDetailsより前にある子要素の高さを引く
+    let sum = 0;
+    for (const ch of Array.from(sidebar.children)) {
+        if (ch === aiDetails) break;
+        sum += ch.offsetHeight || 0;
+    }
+    // 少しマージンを残す
+    const avail = Math.max(120, sidebar.clientHeight - sum - 24);
+    resp.style.maxHeight = avail + 'px';
 }
 
 // 設定の保存・読み込み
@@ -917,23 +939,71 @@ async function drawSmartRoute(routePoints) {
         if (data.routes && data.routes.length > 0 && data.routes[0].geometry) {
             const route = data.routes[0];
             const coordinates = route.geometry.coordinates;
-            const hotlineData = coordinates.map((c, index) => [c[1], c[0], index / (coordinates.length - 1)]);
-            // 下地として太い白ラインを引き、上にカラフルなHotlineを重ねることで
-            // ルートが重複した際の色つぶれを防ぎ視認性を確保する
-            const bgCoords = coordinates.map(c => [c[1], c[0]]);
-            const bgLine = L.polyline(bgCoords, { color: '#ffffff', weight: 12, opacity: 0.95, className: 'route-bg' }).addTo(routeLayer);
+                    const hotlineData = coordinates.map((c, index) => [c[1], c[0], index / (coordinates.length - 1)]);
+                    const coordsLatLon = coordinates.map(c => [c[1], c[0]]);
 
-            const hotline = L.hotline(hotlineData, {
-                weight: 6, outlineWidth: 0, // 下地を使うためoutlineは不要
-                palette: { 0.0: '#0000ff', 0.5: '#ff00ff', 1.0: '#ff0000' },
-                opacity: 1.0
-            }).addTo(routeLayer);
-            // ホットラインを前面へ
-            if (hotline.bringToFront) hotline.bringToFront();
+                    // 小さな白い下地を半透明にして目立ちすぎないようにする
+                    const bgCoords = coordsLatLon.slice();
+                    const bgLine = L.polyline(bgCoords, { color: 'rgba(255,255,255,0.85)', weight: 8, opacity: 0.95, className: 'route-bg' }).addTo(routeLayer);
 
-            const arrowLine = L.polyline(bgCoords, { color: 'transparent', weight: 0 }).addTo(routeLayer);
-            arrowLine.arrowheads({ size: '15px', frequency: '80px', fill: true, color: '#ff4500', offsets: { end: "10px" } });
-            if (arrowLine.bringToFront) arrowLine.bringToFront();
+                    // 自己重複（同じ区間を再利用）を検出するヘルパ
+                    function detectRepeatedSegments(latlonArr) {
+                        const seen = new Set();
+                        for (let i = 1; i < latlonArr.length; i++) {
+                            const a = latlonArr[i-1]; const b = latlonArr[i];
+                            const key = `${a[0].toFixed(5)},${a[1].toFixed(5)}|${b[0].toFixed(5)},${b[1].toFixed(5)}`;
+                            if (seen.has(key)) return true;
+                            // also add reverse to detect travel back
+                            const rev = `${b[0].toFixed(5)},${b[1].toFixed(5)}|${a[0].toFixed(5)},${a[1].toFixed(5)}`;
+                            if (seen.has(rev)) return true;
+                            seen.add(key);
+                        }
+                        return false;
+                    }
+
+                    // 座標列を幅 direction(m) だけオフセットする（簡易）
+                    function offsetCoordinates(latlonArr, offsetMeters) {
+                        if (!latlonArr || latlonArr.length < 2) return latlonArr;
+                        const out = [];
+                        const Rlat = 111320; // m per deg lat approx
+                        for (let i = 0; i < latlonArr.length; i++) {
+                            const prev = latlonArr[Math.max(0, i-1)];
+                            const next = latlonArr[Math.min(latlonArr.length-1, i+1)];
+                            const lat = latlonArr[i][0];
+                            // vector from prev to next
+                            const dx = (next[1] - prev[1]) * Math.cos(lat * Math.PI/180) * Rlat; // meters approx
+                            const dy = (next[0] - prev[0]) * Rlat;
+                            // perp
+                            let px = -dy; let py = dx;
+                            const norm = Math.hypot(px, py) || 1;
+                            px = px / norm; py = py / norm;
+                            // convert meters to degrees
+                            const dLat = (py * offsetMeters) / Rlat;
+                            const dLon = (px * offsetMeters) / (Rlat * Math.cos(lat * Math.PI/180));
+                            out.push([lat + dLat, latlonArr[i][1] + dLon]);
+                        }
+                        return out;
+                    }
+
+                    const hasRepeat = detectRepeatedSegments(coordsLatLon);
+                    if (hasRepeat) {
+                        // 重複がある場合は左右に2列にオフセットして描画
+                        const left = offsetCoordinates(coordsLatLon, 3);
+                        const right = offsetCoordinates(coordsLatLon, -3);
+                        L.polyline(left, { color: '#ffd1d9', weight: 6, opacity: 0.95 }).addTo(routeLayer);
+                        L.polyline(right, { color: '#d1f0ff', weight: 6, opacity: 0.95 }).addTo(routeLayer);
+                    }
+
+                    const hotline = L.hotline(hotlineData, {
+                        weight: 8, outlineWidth: 0,
+                        palette: { 0.0: '#00aaff', 0.5: '#ff33cc', 1.0: '#ff4500' },
+                        opacity: 1.0
+                    }).addTo(routeLayer);
+                    if (hotline.bringToFront) hotline.bringToFront();
+
+                    const arrowLine = L.polyline(bgCoords, { color: 'transparent', weight: 0 }).addTo(routeLayer);
+                    arrowLine.arrowheads({ size: '15px', frequency: '80px', fill: true, color: '#ff4500', offsets: { end: "10px" } });
+                    if (arrowLine.bringToFront) arrowLine.bringToFront();
 
             map.fitBounds(hotline.getBounds(), { padding: [50, 50], maxZoom: 17 });
             addRouteMarkers(routePoints);
@@ -991,4 +1061,8 @@ function renderRouteSidebar(data) {
     });
     html += `<small style="color:#666;">※青(スタート)から赤(ゴール)へ。<br>矢印の方向に進んでください。</small>`;
     responseArea.innerHTML = html;
+    // スクロール位置を末尾へ移動して、ユーザーが下まで見やすいようにする
+    try { responseArea.scrollTop = responseArea.scrollHeight; } catch(e) {}
+    // 高さを再計算
+    adjustAiResponseHeight();
 }
