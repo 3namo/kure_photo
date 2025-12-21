@@ -383,6 +383,9 @@ button#btn-search:disabled { background: #ccc; cursor: not-allowed; box-shadow: 
     max-height: calc(100vh - 260px);
 }
 
+/* ルート背景（白）を丸い線端で描画して視認性を高める */
+.route-bg { stroke-linecap: round; stroke-linejoin: round; }
+
 .route-theme { 
     font-size: 1.3em; font-weight: bold; color: #333; margin-bottom: 12px; 
     text-align: center; line-height: 1.4;
@@ -440,4 +443,28 @@ button#btn-search:disabled { background: #ccc; cursor: not-allowed; box-shadow: 
 @media (max-width: 600px) {
     #sidebar { width: 100%; position: absolute; height: 100%; }
     .mobile-only { display: block; }
+}
+
+/* --- 強制オーバーライド: サイドバー内のスクロール割り当てを安定化 --- */
+#sidebar {
+    overflow: hidden !important; /* 外側スクロールを無効化し、内部要素で管理 */
+}
+.settings-accordion {
+    flex: 0 0 auto !important;
+}
+.settings-content {
+    max-height: 220px !important;
+}
+.ai-accordion {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+}
+.ai-response-content {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow-y: auto !important;
+}
+#log-area {
+    max-height: 200px !important;
 }

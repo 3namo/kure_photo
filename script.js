@@ -918,13 +918,22 @@ async function drawSmartRoute(routePoints) {
             const route = data.routes[0];
             const coordinates = route.geometry.coordinates;
             const hotlineData = coordinates.map((c, index) => [c[1], c[0], index / (coordinates.length - 1)]);
-            const hotline = L.hotline(hotlineData, {
-                weight: 6, outlineWidth: 1, outlineColor: 'white',
-                palette: { 0.0: '#0000ff', 0.5: '#ff00ff', 1.0: '#ff0000' }
-            }).addTo(routeLayer);
+            // 下地として太い白ラインを引き、上にカラフルなHotlineを重ねることで
+            // ルートが重複した際の色つぶれを防ぎ視認性を確保する
+            const bgCoords = coordinates.map(c => [c[1], c[0]]);
+            const bgLine = L.polyline(bgCoords, { color: '#ffffff', weight: 12, opacity: 0.95, className: 'route-bg' }).addTo(routeLayer);
 
-            const arrowLine = L.polyline(coordinates.map(c => [c[1], c[0]]), { color: 'transparent', weight: 0 }).addTo(routeLayer);
+            const hotline = L.hotline(hotlineData, {
+                weight: 6, outlineWidth: 0, // 下地を使うためoutlineは不要
+                palette: { 0.0: '#0000ff', 0.5: '#ff00ff', 1.0: '#ff0000' },
+                opacity: 1.0
+            }).addTo(routeLayer);
+            // ホットラインを前面へ
+            if (hotline.bringToFront) hotline.bringToFront();
+
+            const arrowLine = L.polyline(bgCoords, { color: 'transparent', weight: 0 }).addTo(routeLayer);
             arrowLine.arrowheads({ size: '15px', frequency: '80px', fill: true, color: '#ff4500', offsets: { end: "10px" } });
+            if (arrowLine.bringToFront) arrowLine.bringToFront();
 
             map.fitBounds(hotline.getBounds(), { padding: [50, 50], maxZoom: 17 });
             addRouteMarkers(routePoints);
