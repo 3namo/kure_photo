@@ -942,10 +942,6 @@ async function drawSmartRoute(routePoints) {
                     const hotlineData = coordinates.map((c, index) => [c[1], c[0], index / (coordinates.length - 1)]);
                     const coordsLatLon = coordinates.map(c => [c[1], c[0]]);
 
-                    // 小さな白い下地を半透明にして目立ちすぎないようにする
-                    const bgCoords = coordsLatLon.slice();
-                    const bgLine = L.polyline(bgCoords, { color: 'rgba(255,255,255,0.85)', weight: 8, opacity: 0.95, className: 'route-bg' }).addTo(routeLayer);
-
                     // 自己重複（同じ区間を再利用）を検出するヘルパ
                     function detectRepeatedSegments(latlonArr) {
                         const seen = new Set();
@@ -987,18 +983,40 @@ async function drawSmartRoute(routePoints) {
 
                     const hasRepeat = detectRepeatedSegments(coordsLatLon);
                     if (hasRepeat) {
-                        // 重複がある場合は左右に2列にオフセットして描画
+                        // 重複がある場合は左右に2列にオフセットしてホットラインで描画
                         const left = offsetCoordinates(coordsLatLon, 3);
                         const right = offsetCoordinates(coordsLatLon, -3);
-                        L.polyline(left, { color: '#ffd1d9', weight: 6, opacity: 0.95 }).addTo(routeLayer);
-                        L.polyline(right, { color: '#d1f0ff', weight: 6, opacity: 0.95 }).addTo(routeLayer);
-                    }
+                        const leftHot = left.map((c, index) => [c[0], c[1], index / (left.length - 1)]);
+                        const rightHot = right.map((c, index) => [c[0], c[1], index / (right.length - 1)]);
+                        const leftHotline = L.hotline(leftHot, {
+                            weight: 6, outlineWidth: 0,
+                            palette: { 0.0: '#0000ff', 0.5: '#ff00ff', 1.0: '#ff0000' },
+                            opacity: 1.0
+                        }).addTo(routeLayer);
+                        const rightHotline = L.hotline(rightHot, {
+                            weight: 6, outlineWidth: 0,
+                            palette: { 0.0: '#0000ff', 0.5: '#ff00ff', 1.0: '#ff0000' },
+                            opacity: 1.0
+                        }).addTo(routeLayer);
+                        if (leftHotline.bringToFront) leftHotline.bringToFront();
+                        if (rightHotline.bringToFront) rightHotline.bringToFront();
+                        // 矢印線は中央軸に沿って表示（透明ポリラインに対して矢印を描く）
+                        const centerLine = coordsLatLon.slice();
+                        const arrowLine = L.polyline(centerLine, { color: 'transparent', weight: 0 }).addTo(routeLayer);
+                        arrowLine.arrowheads({ size: '15px', frequency: '80px', fill: true, color: '#ff4500', offsets: { end: "10px" } });
+                        if (arrowLine.bringToFront) arrowLine.bringToFront();
+                    } else {
+                        const hotline = L.hotline(hotlineData, {
+                            weight: 6, outlineWidth: 0,
+                            palette: { 0.0: '#0000ff', 0.5: '#ff00ff', 1.0: '#ff0000' },
+                            opacity: 1.0
+                        }).addTo(routeLayer);
+                        if (hotline.bringToFront) hotline.bringToFront();
 
-                    const hotline = L.hotline(hotlineData, {
-                        weight: 8, outlineWidth: 0,
-                        palette: { 0.0: '#00aaff', 0.5: '#ff33cc', 1.0: '#ff4500' },
-                        opacity: 1.0
-                    }).addTo(routeLayer);
+                        const arrowLine = L.polyline(coordsLatLon, { color: 'transparent', weight: 0 }).addTo(routeLayer);
+                        arrowLine.arrowheads({ size: '15px', frequency: '80px', fill: true, color: '#ff4500', offsets: { end: "10px" } });
+                        if (arrowLine.bringToFront) arrowLine.bringToFront();
+                    }
                     if (hotline.bringToFront) hotline.bringToFront();
 
                     const arrowLine = L.polyline(bgCoords, { color: 'transparent', weight: 0 }).addTo(routeLayer);
