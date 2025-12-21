@@ -462,7 +462,8 @@ button#btn-search:disabled { background: #ccc; cursor: not-allowed; box-shadow: 
 .ai-response-content {
     flex: 1 1 auto !important;
     min-height: 0 !important;
-    max-height: none !important;
+    /* JSで高さを制御するため、デフォルトの最大高さに戻す（!importantは避ける） */
+    max-height: calc(100vh - 260px);
     overflow-y: auto !important;
 }
 #log-area {
