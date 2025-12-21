@@ -387,22 +387,7 @@ async function fetchOverpass(lat, lon) {
             addSpotToMap(elLat, elLon, type, name || type, "OSM", bg, icon, el.id);
         });
         log(`🌍 OSM: ${data.elements.length}件`);
-        // OSMの水辺で同名スポットが複数ある場合、それらを線で結ぶ（簡易）
-        try {
-            const waterGroups = {};
-            gatheredSpots.forEach(s => {
-                if ((s.type||'').includes('水') && s.name) {
-                    (waterGroups[s.name] = waterGroups[s.name] || []).push([s.lat, s.lon]);
-                }
-            });
-            Object.keys(waterGroups).forEach(name => {
-                const pts = waterGroups[name];
-                if (pts.length >= 2) {
-                    const poly = L.polyline(pts, { color: '#1E90FF', weight: 3, dashArray: '6,6', opacity: 0.8 }).addTo(routeLayer);
-                    poly.bindPopup(`水辺: ${name}`);
-                }
-            });
-        } catch(e) { log('❌ 同名水辺線描画でエラー: ' + e.message); }
+        // （注）同名水辺を自動で結ぶ描画はユーザーから不要との要望があったため削除しました。
     } catch(e) { log(`❌ OSMエラー: ${e.message}`); }
 }
 
