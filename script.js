@@ -31,6 +31,7 @@ function getSearchParameters(minutes) {
 window.onload = function() {
     loadSettings();
 
+    // マップ初期化
     map = L.map('map').setView([34.248, 132.565], 14);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors'
@@ -38,16 +39,19 @@ window.onload = function() {
     markersLayer.addTo(map);
     routeLayer.addTo(map);
 
+    // 初期状態設定
     document.getElementById('gps-mode-toggle').checked = false;
     gpsMode = false;
     updateLocationHint();
 
+    // マップクリックイベント
     map.on('click', function(e) {
         if (!gpsMode) {
             handleMapClick(e);
         }
     });
 
+    // マップクリック時の処理
     async function handleMapClick(e) {
         try {
             if (window.routeLocked) {
@@ -577,7 +581,7 @@ async function askAI() {
    - 短すぎるルートはNGですが、長すぎるルートもNGです。${duration}分前後を目指してスポット数を選んでください。
    - 往復は避け、なるべく一筆書きや周回ルートにしてください。
 3. **出力形式:**
-   - 必ず以下のJSON形式のみで出力してください。
+   - 必ず以下のJSON形式のみで出力してください。挨拶文などは不要です。
 
 【スポット候補リスト】
 ${JSON.stringify(spotsListJson)}
@@ -595,14 +599,21 @@ ${JSON.stringify(spotsListJson)}
         const res = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+            body: JSON.stringify({ 
+                contents: [{ parts: [{ text: prompt }] }],
+                generationConfig: { response_mime_type: "application/json" } // JSONモード強制
+            })
         });
         
         const result = await res.json();
         if (result.error) throw new Error(result.error.message);
         let text = result.candidates[0].content.parts[0].text;
-        text = text.replace(/^```json\s*/, "").replace(/\s*```$/, "");
-
+        // JSON形式の抽出を強化
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+            text = jsonMatch[0];
+        }
+        
         const routeData = JSON.parse(text);
         window.lastRouteData = routeData;
 
