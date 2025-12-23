@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>呉市お散歩アプリ (Full Ver.)</title>
+    <title>呉市お散歩アプリ (Hybrid Ver.)</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -52,20 +52,32 @@
                         <label class="toggle-label">
                             <input type="checkbox" id="gps-mode-toggle" onchange="toggleLocationMode()">
                             <span class="toggle-slider"></span>
-                            <span class="mode-text">GPS自動取得: <span id="mode-status">OFF (マップクリック)</span></span>
+                            <span class="mode-text">GPS自動取得: <span id="mode-status">OFF</span></span>
                         </label>
                     </div>
                     <div class="hint" id="location-hint">※マップをクリックして現在地を指定してください</div>
                 </div>
 
                 <div class="control-group">
-                    <label>1. Gemini APIキー (必須)</label>
+                    <label>🤖 ルート生成モード</label>
+                    <div class="location-mode-toggle">
+                        <label class="toggle-label">
+                            <input type="checkbox" id="ai-mode-toggle" onchange="toggleAiMode()" checked>
+                            <span class="toggle-slider" style="background-color: #007bff;"></span>
+                            <span class="mode-text">AIモード: <span id="ai-mode-status" style="font-weight:bold; color:#007bff;">ON</span></span>
+                        </label>
+                    </div>
+                    <div class="hint" id="ai-mode-hint">Gemini AIが文脈を読んでプランを作成します</div>
+                </div>
+
+                <div class="control-group" id="api-key-group">
+                    <label>Gemini APIキー (AIモード時必須)</label>
                     <input type="password" id="gemini-key" placeholder="AI Studioで取得したキーを入力">
                 </div>
 
                 <div class="control-group">
                     <div class="accordion-header" onclick="toggleDatasetInput()">
-                        <label style="cursor:pointer; margin:0;">2. 呉市データセットID <small>(設定)</small></label>
+                        <label style="cursor:pointer; margin:0;">データセットID設定 <small>(任意)</small></label>
                         <i id="dataset-arrow" class="fa-solid fa-chevron-down"></i>
                     </div>
                     
@@ -78,23 +90,22 @@
                 </div>
 
                 <div class="control-group">
-                    <label>3. 今の気分・テーマ</label>
-                    <input type="text" id="user-mood" placeholder="例: 神社に行きたい、川沿いを歩きたい">
-                    <div class="hint">※「神社」「海」など具体的に書くとAIが優先します</div>
+                    <label>気分・テーマ</label>
+                    <input type="text" id="user-mood" placeholder="例: 神社、海沿い、レトロ">
+                    <div class="hint">※「標準モード」ではキーワード検索として機能します</div>
                 </div>
 
                 <div class="control-group">
-                    <label>4. 所要時間 (分)</label>
-                    <input type="number" id="walk-duration" placeholder="例: 70" value="70">
+                    <label>所要時間 (分)</label>
+                    <input type="number" id="walk-duration" placeholder="例: 60" value="60">
                     
-                    <label style="margin-top:10px;">5. ゴール地点 (任意)</label>
-                    <div class="hint">※空欄ならAIが良い場所を提案します</div>
+                    <label style="margin-top:10px;">ゴール地点 (任意)</label>
                     <input type="text" id="final-dest" placeholder="例: 呉駅、大和ミュージアム">
                 </div>
             </div>
         </details>
 
-        <button id="btn-search" onclick="askAI()" disabled>AIにプランを聞く</button>
+        <button id="btn-search" onclick="planRoute()" disabled>プランを作成</button>
         
         <details class="settings-accordion">
             <summary class="settings-summary">
@@ -106,7 +117,7 @@
         
         <details id="ai-result-details" class="ai-accordion" open>
             <summary class="ai-summary">
-                <span><i class="fa-solid fa-map"></i> 🤖 AIプラン結果</span>
+                <span><i class="fa-solid fa-map"></i> <span id="result-title-label">プラン結果</span></span>
                 <i class="accordion-arrow fa-solid fa-chevron-up"></i>
             </summary>
             <div id="ai-response" class="ai-response-content">地図をクリックすると探索を開始します。</div>
@@ -115,11 +126,10 @@
             </div>
         </details>
     
-        <!-- モーダル: 新しい探索確認（洗練されたUI） -->
         <div id="confirm-modal" class="confirm-modal-overlay" role="dialog" aria-modal="true" aria-hidden="true">
             <div class="confirm-modal" role="document">
                 <h3 id="confirm-modal-title">新しい探索を開始しますか？</h3>
-                <p id="confirm-modal-message">現在のAIプランは破棄されます。よろしいですか？</p>
+                <p id="confirm-modal-message">現在のプランは破棄されます。よろしいですか？</p>
                 <div class="modal-actions">
                     <button id="confirm-cancel" class="btn secondary">キャンセル</button>
                     <button id="confirm-ok" class="btn danger">破棄して開始</button>

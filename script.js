@@ -16,14 +16,13 @@ let gatheredSpots = [];
 let weatherDescription = "";
 let forecastText = "";
 let gpsMode = false;
+let useAiMode = true; // ★新機能: AIモードフラグ
 let currentLocationMarker = null;
 let isResizing = false;
 
-// ★動的パラメータ計算: 時間(分)に応じて検索半径と候補数を最適化
+// ★動的パラメータ計算
 function getSearchParameters(minutes) {
-    // 30分=半径800m, 60分=1.5km, 最大3km
     let radius = Math.min(3000, Math.max(800, minutes * 25));
-    // 候補数: 30分=15件 〜 最大45件 (トークン節約と速度向上)
     let maxCandidates = Math.min(45, Math.max(15, Math.floor(minutes / 1.5)));
     return { radius, maxCandidates };
 }
@@ -31,7 +30,6 @@ function getSearchParameters(minutes) {
 window.onload = function() {
     loadSettings();
 
-    // マップ初期化
     map = L.map('map').setView([34.248, 132.565], 14);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors'
@@ -39,23 +37,29 @@ window.onload = function() {
     markersLayer.addTo(map);
     routeLayer.addTo(map);
 
-    // 初期状態設定
+    // GPS設定初期化
     document.getElementById('gps-mode-toggle').checked = false;
     gpsMode = false;
     updateLocationHint();
 
-    // マップクリックイベント
+    // AIモード設定初期化
+    const savedAiMode = localStorage.getItem('kureApp_useAiMode');
+    if (savedAiMode !== null) {
+        useAiMode = (savedAiMode === 'true');
+        document.getElementById('ai-mode-toggle').checked = useAiMode;
+    }
+    updateAiModeUI();
+
     map.on('click', function(e) {
         if (!gpsMode) {
             handleMapClick(e);
         }
     });
 
-    // マップクリック時の処理
     async function handleMapClick(e) {
         try {
             if (window.routeLocked) {
-                const ok = await showConfirmation('新しい探索を開始しますか？', '現在のAIプランは破棄されます。続行して新しい場所を指定しますか？');
+                const ok = await showConfirmation('新しい探索を開始しますか？', '現在のプランは破棄されます。続行して新しい場所を指定しますか？');
                 if (!ok) return;
                 window.routeLocked = false;
                 try { showNewSearchButton(false); } catch(e) {}
@@ -78,7 +82,7 @@ window.onload = function() {
     const newBtn = document.getElementById('btn-new-search');
     if (newBtn) {
         newBtn.addEventListener('click', async function() {
-            const ok = await showConfirmation('新しい探索を開始しますか？', '現在のAIプランは破棄されます。続行しますか？');
+            const ok = await showConfirmation('新しい探索を開始しますか？', '現在のプランは破棄されます。続行しますか？');
             if (!ok) return;
             window.routeLocked = false;
             showNewSearchButton(false);
@@ -92,6 +96,33 @@ function showNewSearchButton(show) {
     const btn = document.getElementById('btn-new-search');
     if (!btn) return;
     btn.style.display = show ? 'block' : 'none';
+}
+
+function toggleAiMode() {
+    useAiMode = document.getElementById('ai-mode-toggle').checked;
+    localStorage.setItem('kureApp_useAiMode', useAiMode);
+    updateAiModeUI();
+}
+
+function updateAiModeUI() {
+    const statusEl = document.getElementById('ai-mode-status');
+    const hintEl = document.getElementById('ai-mode-hint');
+    const apiKeyGroup = document.getElementById('api-key-group');
+    const label = document.getElementById('result-title-label');
+
+    if (useAiMode) {
+        statusEl.textContent = 'ON';
+        statusEl.style.color = '#007bff';
+        hintEl.textContent = 'Gemini AIが文脈を読んでプランを作成します';
+        apiKeyGroup.style.display = 'block'; // AI時はキー入力必須
+        if(label) label.textContent = "🤖 AIプラン結果";
+    } else {
+        statusEl.textContent = 'OFF (標準)';
+        statusEl.style.color = '#555';
+        hintEl.textContent = 'キーワードと距離に基づき高速にルートを作成します(APIキー不要)';
+        apiKeyGroup.style.display = 'none'; // 標準時は隠す
+        if(label) label.textContent = "🗺️ 標準プラン結果";
+    }
 }
 
 function showConfirmation(title, message) {
@@ -222,6 +253,7 @@ function getCurrentLocation() {
             log(`✅ GPS成功: ${lat.toFixed(4)}, ${lon.toFixed(4)}`);
             map.setView([lat, lon], 16);
             if (currentLocationMarker) markersLayer.removeLayer(currentLocationMarker);
+            
             const icon = L.divIcon({
                 className: '',
                 html: `<div style="width:28px; height:28px; background:#007bff; border-radius:50%; border:3px solid white; box-shadow:0 0 10px rgba(0,123,255,0.5);"></div>`,
@@ -265,9 +297,6 @@ function log(msg) {
     }
 }
 
-// ==========================================
-// 1. データ探索フェーズ
-// ==========================================
 async function startExploration(lat, lon) {
     currentLat = lat; currentLon = lon;
     gatheredSpots = [];
@@ -287,16 +316,13 @@ async function startExploration(lat, lon) {
     const idShelter = document.getElementById('id-shelter').value;
 
     const duration = Number(document.getElementById('walk-duration').value) || 60;
-    // ★改善: 所要時間から最適な検索半径と候補数を算出
     const params = getSearchParameters(duration);
-    log(`⚙️ 設定: 所要${duration}分 -> 検索半径${params.radius}m / AI候補数${params.maxCandidates}件`);
+    log(`⚙️ 設定: 所要${duration}分 -> 検索半径${params.radius}m`);
 
     const promises = [];
     promises.push(fetchWeather(lat, lon));
-    // ★改善: OSMには計算した半径を渡す
     promises.push(fetchOverpass(lat, lon, params.radius));
     
-    // ★重要: データプラットフォームくれ の情報を必ず取得する
     if(idManhole) promises.push(fetchKureData(idManhole, "デザインマンホール"));
     if(idCulture) promises.push(fetchKureData(idCulture, "文化財・レトロ"));
     if(idShelter) promises.push(fetchKureData(idShelter, "避難所・高台"));
@@ -305,7 +331,7 @@ async function startExploration(lat, lon) {
 
     log(`✅ 完了。${gatheredSpots.length} 件のスポット発見。`);
     document.getElementById('btn-search').disabled = false;
-    document.getElementById('ai-response').innerHTML = `データ収集完了！<br>現在の天気: ${weatherDescription}<br>発見スポット: ${gatheredSpots.length}件<br>「AIにプランを聞く」を押してください。`;
+    document.getElementById('ai-response').innerHTML = `データ収集完了！<br>現在の天気: ${weatherDescription}<br>発見スポット: ${gatheredSpots.length}件<br>「プランを作成」を押してください。`;
 }
 
 async function fetchWeather(lat, lon) {
@@ -353,7 +379,6 @@ async function fetchWeather(lat, lon) {
     }
 }
 
-// ★修正: OSMからは避難所などは取得しない（くれAPI優先のため）。検索半径を動的に。
 async function fetchOverpass(lat, lon, radius) {
     log(`🌍 OSMデータ検索中(半径${radius}m)...`);
     const query = `
@@ -372,7 +397,7 @@ async function fetchOverpass(lat, lon, radius) {
             relation["waterway"~"river|stream|canal"](around:${radius},${lat},${lon});
             way["natural"="coastline"](around:${radius},${lat},${lon});
             
-            // 階段や自販機は半径固定(小さめ)
+            // 階段などは半径を少し絞る（数が多すぎるため）
             way["highway"="steps"](around:${Math.min(1000, radius)},${lat},${lon});
             way["highway"="path"](around:${Math.min(1000, radius)},${lat},${lon});
             node["amenity"="vending_machine"](around:${Math.min(1000, radius)},${lat},${lon});
@@ -521,25 +546,107 @@ function addSpotToMap(lat, lon, type, name, source, bgClass, iconClass="fa-map-p
     L.marker([lat, lon], {icon: icon}).bindPopup(`<b>${name}</b><br>${type}<br><small>${source}</small>`).addTo(markersLayer);
 }
 
+// ★メインの分岐関数: モードに応じて処理を振り分ける
+async function planRoute() {
+    if (gatheredSpots.length === 0) { alert("周辺にスポットがありません"); return; }
+    
+    if (useAiMode) {
+        await generateRouteWithGemini();
+    } else {
+        await generateRouteStandard();
+    }
+}
+
 // ==========================================
-// 2. AIプランニングフェーズ
+// ★標準モード (AIなし) - アルゴリズムによる生成
 // ==========================================
-async function askAI() {
+async function generateRouteStandard() {
+    const mood = document.getElementById('user-mood').value;
+    const duration = Number(document.getElementById('walk-duration').value) || 60;
+    
+    document.getElementById('ai-result-details').open = true;
+    document.getElementById('ai-response').innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 標準アルゴリズムで計算中...';
+    routeLayer.clearLayers();
+
+    window.requestedDuration = duration;
+    window.userMood = mood;
+
+    // 1. スコアリング
+    const scoredSpots = gatheredSpots.map(spot => {
+        let score = 0;
+        if (mood.includes("神社") && spot.type === "神社") score += 500;
+        if ((mood.includes("寺") || mood.includes("仏閣")) && spot.type === "寺院") score += 500;
+        if ((mood.includes("海") || mood.includes("川")) && spot.type.includes("水")) score += 300;
+        if (mood.includes("レトロ") && (spot.type.includes("歴史") || spot.type === "マンホール" || spot.source === "KureOfficial")) score += 300;
+        
+        // 距離による加点 (近すぎず遠すぎず)
+        const dist = Math.sqrt(Math.pow(currentLat - spot.lat, 2) + Math.pow(currentLon - spot.lon, 2));
+        if (dist > 0.002 && dist < 0.015) score += 50; 
+
+        return { ...spot, score: score + Math.random() * 50 };
+    });
+
+    // 2. 上位選定 (時間は60分で5箇所程度を目安)
+    scoredSpots.sort((a, b) => b.score - a.score);
+    const count = Math.max(3, Math.floor(duration / 12));
+    const candidates = scoredSpots.slice(0, count * 2); // 多めに候補を取る
+
+    // 3. ルート構築 (Greedy法)
+    let route = [];
+    let current = { lat: currentLat, lon: currentLon };
+    let unvisited = candidates.slice();
+
+    for(let i=0; i<count; i++) {
+        let nearestIdx = -1;
+        let minDist = Infinity;
+        for(let j=0; j<unvisited.length; j++) {
+            const p = unvisited[j];
+            const d = Math.pow(current.lat - p.lat, 2) + Math.pow(current.lon - p.lon, 2);
+            if(d < minDist) { minDist = d; nearestIdx = j; }
+        }
+        if(nearestIdx !== -1) {
+            const pick = unvisited[nearestIdx];
+            route.push({ 
+                name: pick.name, lat: pick.lat, lon: pick.lon, 
+                photo_tip: `[標準] ${pick.type}スポットです` 
+            });
+            current = pick;
+            unvisited.splice(nearestIdx, 1);
+        } else break;
+    }
+
+    // 4. データ作成
+    const routeData = {
+        theme: `【標準】${mood || 'おまかせ'}探索コース`,
+        route: route
+    };
+    
+    window.lastRouteData = routeData;
+    renderRouteSidebar(routeData);
+    window.routeLocked = true;
+    try { showNewSearchButton(true); } catch(e) {}
+    
+    // 5. 描画
+    log("🗺️ 標準ルート計算完了。地図描画を開始します...");
+    drawSmartRoute(routeData.route).catch(err => console.error(err));
+}
+
+// ==========================================
+// ★AIモード (Gemini) - 既存の askAI をリネーム
+// ==========================================
+async function generateRouteWithGemini() {
     const geminiKey = document.getElementById('gemini-key').value;
     const mood = document.getElementById('user-mood').value;
     const duration = Number(document.getElementById('walk-duration').value) || 60;
-    window.requestedDuration = duration;
-    window.userMood = mood;
     const destination = document.getElementById('final-dest').value || "AIにお任せ(最適な場所)";
     
     if(!geminiKey) { alert("Gemini APIキーを入力してください"); return; }
-    if(gatheredSpots.length === 0) { alert("周辺にスポットがありません"); return; }
 
     document.getElementById('ai-result-details').open = true;
     document.getElementById('ai-response').innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> AIがルートを計算中...';
     routeLayer.clearLayers();
 
-    // ★改善: 所要時間に応じたパラメータを取得
+    // ★改善: パラメータ取得
     const params = getSearchParameters(duration);
 
     const scoredSpots = gatheredSpots.map(spot => {
@@ -556,7 +663,7 @@ async function askAI() {
         if (spot.type && (spot.type.includes("絶景") || spot.type.includes("高台"))) {
             if (mood.includes("景") || mood.includes("view")) score += 150; else score += 30;
         }
-        // ★改善: スタート地点から遠すぎるスポットは減点（物理的に無理な移動を抑制）
+        // スタート地点から遠すぎるスポットは減点
         const distFromStart = Math.sqrt(Math.pow(currentLat - spot.lat, 2) + Math.pow(currentLon - spot.lon, 2));
         score -= distFromStart * 1000; 
 
@@ -564,7 +671,7 @@ async function askAI() {
     });
 
     scoredSpots.sort((a, b) => b.score - a.score);
-    // ★改善: 探索時間を短縮するため、候補数を動的に制限（以前は固定で多かった）
+    // ★改善: 候補数を動的に制限
     const spotsListJson = scoredSpots.slice(0, params.maxCandidates).map(s => ({ name: s.name, type: s.type, lat: s.lat, lon: s.lon }));
 
     const prompt = `
@@ -601,18 +708,15 @@ ${JSON.stringify(spotsListJson)}
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
                 contents: [{ parts: [{ text: prompt }] }],
-                generationConfig: { response_mime_type: "application/json" } // JSONモード強制
+                generationConfig: { response_mime_type: "application/json" }
             })
         });
         
         const result = await res.json();
         if (result.error) throw new Error(result.error.message);
         let text = result.candidates[0].content.parts[0].text;
-        // JSON形式の抽出を強化
         const jsonMatch = text.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-            text = jsonMatch[0];
-        }
+        if (jsonMatch) { text = jsonMatch[0]; }
         
         const routeData = JSON.parse(text);
         window.lastRouteData = routeData;
@@ -635,8 +739,7 @@ async function drawSmartRoute(routePoints) {
     const requested = (window.requestedDuration !== undefined) ? Number(window.requestedDuration) : null;
     const minAllowed = requested ? Math.max(0, requested - 15) : null;
 
-    // ★LINEヤフー技術提案: グリーディ法によるルート並べ替え (整合性確保)
-    // 現在地から近い順にスポットを巡るよう並べ替えることで、無駄な往復を排除する
+    // グリーディ法によるルート並べ替え
     function optimizeRouteOrder(start, points) {
         let current = start;
         let unvisited = points.slice();
@@ -660,7 +763,6 @@ async function drawSmartRoute(routePoints) {
         return ordered;
     }
 
-    // AIのルートを地理的に最適化
     let optimizedPts = optimizeRouteOrder({lat: currentLat, lon: currentLon}, routePoints);
 
     async function getOsrmForPoints(points) {
@@ -671,18 +773,15 @@ async function drawSmartRoute(routePoints) {
         return await res.json();
     }
 
-    // ★LINEヤフー技術提案: 時間超過時の厳格なカット (Strict Pruning)
-    // 指定時間を大幅に超える場合、遠いスポットから削除して再計算する
+    // 時間超過時の厳格なカット (Strict Pruning)
     async function pruneRouteToMaxMinutes(pts, maxMinutes) {
         let currentPts = pts.slice();
-        // 最大5回まで試行して調整
         for(let i=0; i<5; i++) {
             const data = await getOsrmForPoints(currentPts);
             if (!data.routes || data.routes.length === 0) break;
             const dist = data.routes[0].distance;
             const mins = Math.round((dist / 1000) / 4.0 * 60);
             
-            // 許容誤差(+10分)以内ならOK
             if (mins <= maxMinutes + 10) {
                 return { pts: currentPts, data, walkMinutes: mins, distMeters: dist };
             }
@@ -690,13 +789,12 @@ async function drawSmartRoute(routePoints) {
             if (currentPts.length <= 1) return { pts: currentPts, data, walkMinutes: mins, distMeters: dist };
             
             log(`⏱ ルート ${mins}分 は長すぎます(目標${maxMinutes}分)。末尾のスポットを削除して調整します。`);
-            currentPts.pop(); // 一番最後(遠い)スポットを削除
+            currentPts.pop(); 
         }
         return { pts: currentPts, data: null, walkMinutes: 0, distMeters: 0 };
     }
 
     async function tryExpandRouteToMinMinutes(pts, minAllowed, requested) {
-        // (既存の延伸ロジックは維持)
         const used = new Set(pts.map(p => (p.name || (p.lat + ',' + p.lon))));
         let candidates = gatheredSpots.filter(s => !used.has(s.name));
         if (!candidates || candidates.length === 0) return { pts, data: null, walkMinutes: 0, distMeters: 0 };
@@ -877,7 +975,6 @@ async function drawSmartRoute(routePoints) {
     }
 
     try {
-        // ★修正: 最適化されたルート(optimizedPts)を使用
         let pts = optimizedPts; 
         
         if (window.userMood && (window.userMood.includes('川') || window.userMood.includes('水') || window.userMood.includes('海'))) {
@@ -892,7 +989,6 @@ async function drawSmartRoute(routePoints) {
             walkMinutes = Math.round((distMeters / 1000) / 4.0 * 60);
         }
 
-        // ★改善: 時間が長すぎる場合の強制カット (Pruning)
         if (requested && walkMinutes > requested + 10) {
             const pruned = await pruneRouteToMaxMinutes(pts, requested);
             pts = pruned.pts;
@@ -902,7 +998,6 @@ async function drawSmartRoute(routePoints) {
             log(`✅ 時間調整完了: ${walkMinutes}分 (最適化後)`);
         }
 
-        // 時間が短すぎる場合の延伸
         if (requested && minAllowed !== null && walkMinutes < minAllowed) {
             log(`⚠️ ルート ${walkMinutes}分 は短すぎます。自動延伸します...`);
             const expanded = await tryExpandRouteToMinMinutes(pts, minAllowed, requested);
@@ -917,7 +1012,6 @@ async function drawSmartRoute(routePoints) {
             }
         }
 
-        // 描画処理
         if (data.routes && data.routes.length > 0 && data.routes[0].geometry) {
             const route = data.routes[0];
             const coordinates = route.geometry.coordinates;
@@ -1034,7 +1128,6 @@ function renderRouteSidebar(data) {
     let html = `<div class="route-theme">“ ${data.theme} ”</div>`;
     html += `<div class="route-meta"><i class="fa-solid fa-person-walking"></i> <span>${distStr}</span> &nbsp;/&nbsp; <i class="fa-solid fa-clock"></i> <span>${timeStr}</span></div>`;
     
-    // AIが返したルート(data.route)を使うが、drawSmartRouteで修正されたptsが入っている場合はそちらを使う
     const steps = data.route || []; 
     steps.forEach((step, index) => {
         html += `<div class="route-step">
