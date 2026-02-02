@@ -1,13 +1,12 @@
-=<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>呉市お散歩アプリ (Hybrid Ver.)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>よりみち呉マップ</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://unpkg.com/leaflet-hotline@0.4.0/dist/leaflet.hotline.js"></script>
     <script src="https://unpkg.com/leaflet-arrowheads@1.4.0/src/leaflet-arrowheads.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
@@ -21,9 +20,9 @@
 
     <div id="sidebar">
         <div class="sidebar-header">
-            <h2>呉市フォトウォークアプリ</h2>
+            <h2>呉市フォトウォーク</h2>
             <button id="close-sidebar" onclick="toggleSidebar()" class="mobile-only">
-                <i class="fa-solid fa-times"></i>
+                <i class="fa-solid fa-times"></i> 閉じる
             </button>
         </div>
         
@@ -55,7 +54,7 @@
                             <span class="mode-text">GPS自動取得: <span id="mode-status">OFF</span></span>
                         </label>
                     </div>
-                    <div class="hint" id="location-hint">※マップをクリックして現在地を指定してください</div>
+                    <div class="hint" id="location-hint">※マップをタップして現在地を指定</div>
                 </div>
 
                 <div class="control-group">
@@ -67,22 +66,22 @@
                             <span class="mode-text">AIモード: <span id="ai-mode-status" style="font-weight:bold; color:#007bff;">ON</span></span>
                         </label>
                     </div>
-                    <div class="hint" id="ai-mode-hint">Gemini AIが文脈を読んでプランを作成します</div>
+                    <div class="hint" id="ai-mode-hint">Gemini AIがプランを作成</div>
                 </div>
 
                 <div class="control-group" id="api-key-group">
-                    <label>Gemini APIキー (AIモード時必須)</label>
-                    <input type="password" id="gemini-key" placeholder="AI Studioで取得したキーを入力">
+                    <label>Gemini APIキー (必須)</label>
+                    <input type="password" id="gemini-key" placeholder="AI Studioのキーを入力">
                 </div>
 
                 <div class="control-group">
                     <div class="accordion-header" onclick="toggleDatasetInput()">
-                        <label style="cursor:pointer; margin:0;">データセットID設定 <small>(任意)</small></label>
+                        <label style="cursor:pointer; margin:0;">データセットID (任意)</label>
                         <i id="dataset-arrow" class="fa-solid fa-chevron-down"></i>
                     </div>
                     
                     <div id="dataset-container" style="display:none; margin-top:10px;">
-                        <div class="hint">※カタログURL末尾のIDを入力</div>
+                        <div class="hint">※カタログURL末尾のID</div>
                         <input type="text" id="id-manhole" placeholder="デザインマンホール" value="design-manhole-list-1">
                         <input type="text" id="id-culture" placeholder="文化財・歴史" value="cultural-property-list-1">
                         <input type="text" id="id-shelter" placeholder="避難所(絶景用)" value="shelter-1">
@@ -92,12 +91,11 @@
                 <div class="control-group">
                     <label>気分・テーマ</label>
                     <input type="text" id="user-mood" placeholder="例: 神社、海沿い、レトロ">
-                    <div class="hint">※「標準モード」ではキーワード検索として機能します</div>
                 </div>
 
                 <div class="control-group">
                     <label>所要時間 (分)</label>
-                    <input type="number" id="walk-duration" placeholder="例: 60" value="60">
+                    <input type="number" id="walk-duration" placeholder="例: 60" value="60" inputmode="numeric">
                     
                     <label style="margin-top:10px;">ゴール地点 (任意)</label>
                     <input type="text" id="final-dest" placeholder="例: 呉駅、大和ミュージアム">
@@ -120,19 +118,19 @@
                 <span><i class="fa-solid fa-map"></i> <span id="result-title-label">プラン結果</span></span>
                 <i class="accordion-arrow fa-solid fa-chevron-up"></i>
             </summary>
-            <div id="ai-response" class="ai-response-content">地図をクリックすると探索を開始します。</div>
+            <div id="ai-response" class="ai-response-content">地図をタップして探索を開始します。</div>
             <div style="margin-top:8px;">
-                <button id="btn-new-search" style="display:none; width:100%; padding:8px; background:#ff6b6b; color:white; border:none; border-radius:6px;">新しい探索を開始</button>
+                <button id="btn-new-search" style="display:none; width:100%; padding:12px; background:#ff6b6b; color:white; border:none; border-radius:6px; font-weight:bold;">新しい探索を開始</button>
             </div>
         </details>
     
         <div id="confirm-modal" class="confirm-modal-overlay" role="dialog" aria-modal="true" aria-hidden="true">
             <div class="confirm-modal" role="document">
-                <h3 id="confirm-modal-title">新しい探索を開始しますか？</h3>
-                <p id="confirm-modal-message">現在のプランは破棄されます。よろしいですか？</p>
+                <h3 id="confirm-modal-title">確認</h3>
+                <p id="confirm-modal-message">内容</p>
                 <div class="modal-actions">
                     <button id="confirm-cancel" class="btn secondary">キャンセル</button>
-                    <button id="confirm-ok" class="btn danger">破棄して開始</button>
+                    <button id="confirm-ok" class="btn danger">OK</button>
                 </div>
             </div>
         </div>
