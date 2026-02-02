@@ -999,3 +999,31 @@ async function tryExpandRouteToMinMinutes(pts, minAllowed, requested) {
     }
     return { pts: ptsCopy, data: localData, walkMinutes: localMinutes, distMeters: localDist };
 }
+
+// ===== ルート結果表示関数 =====
+function renderRouteSidebar(data) {
+    const responseArea = document.getElementById('ai-response');
+    if (!responseArea) return;
+    
+    const distStr = (data.distance !== undefined) ? (data.distance / 1000).toFixed(1) + " km" : "-- km";
+    const timeStr = (data.walkMinutes !== undefined) ? data.walkMinutes + " 分" : "-- 分";
+
+    let html = `<div class="route-theme">" ${data.theme} "</div>`;
+    html += `<div class="route-meta"><i class="fa-solid fa-person-walking"></i> <span>${distStr}</span> &nbsp;/&nbsp; <i class="fa-solid fa-clock"></i> <span>${timeStr}</span></div>`;
+    
+    if (data.route && Array.isArray(data.route)) {
+        data.route.forEach((step, index) => {
+            html += `<div class="route-step">
+                <div class="step-name"><span style="color:#ff4500;">Step ${index + 1}:</span> ${step.name}</div>
+                <div class="step-photo"><i class="fa-solid fa-camera"></i> ${step.photo_tip || '撮影スポット'}</div>
+            </div>`;
+        });
+    }
+    
+    if (data.warning) {
+        html += `<div style="color: #ff9800; font-size: 0.85em; margin-top: 10px; padding: 8px; background: #fff3e0; border-radius: 4px;">${data.warning}</div>`;
+    }
+    
+    html += `<small style="color:#666;">※青(スタート)から赤(ゴール)へ。<br>矢印の方向に進んでください。</small>`;
+    responseArea.innerHTML = html;
+}
